@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Habits</title>
+<meta name="color-scheme" content="light dark">
+<style>
+/* Palette: seed hue 260 (cobalt/indigo). Restrained -- neutrals tinted a trace
+   toward the brand hue, one accent that does real work (ticked days, primary
+   action, selection) and no decorative colour anywhere. */
+:root{
+  --bg:oklch(1 0 0);
+  --surface:oklch(0.985 0.003 260);
+  --sunken:oklch(0.955 0.005 260);
+  --line:oklch(0.905 0.008 260);
+  --line-strong:oklch(0.82 0.012 260);
+  --ink:oklch(0.24 0.02 260);
+  --muted:oklch(0.45 0.018 260);   /* 4.9:1 on --bg */
+  --primary:oklch(0.48 0.155 260);
+  --primary-hover:oklch(0.42 0.155 260);
+  --primary-ink:oklch(1 0 0);
+  --primary-wash:oklch(0.94 0.03 260);
+  --danger:oklch(0.52 0.17 25);
+  --radius:10px;
+  --tap:44px;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --z-toast:10;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme=light]){
+    --bg:oklch(0.175 0.012 260);
+    --surface:oklch(0.215 0.015 260);
+    --sunken:oklch(0.255 0.016 260);
+    --line:oklch(0.31 0.02 260);
+    --line-strong:oklch(0.42 0.025 260);
+    --ink:oklch(0.96 0.006 260);
+    --muted:oklch(0.72 0.02 260);   /* 6.3:1 on --bg */
+    --primary:oklch(0.70 0.145 260);
+    --primary-hover:oklch(0.77 0.145 260);
+    --primary-ink:oklch(0.18 0.03 260);
+    --primary-wash:oklch(0.30 0.045 260);
+    --danger:oklch(0.72 0.15 25);
+  }
+}
+:root[data-theme=dark]{
+  --bg:oklch(0.175 0.012 260);
+  --surface:oklch(0.215 0.015 260);
+  --sunken:oklch(0.255 0.016 260);
+  --line:oklch(0.31 0.02 260);
+  --line-strong:oklch(0.42 0.025 260);
+  --ink:oklch(0.96 0.006 260);
+  --muted:oklch(0.72 0.02 260);
+  --primary:oklch(0.70 0.145 260);
+  --primary-hover:oklch(0.77 0.145 260);
+  --primary-ink:oklch(0.18 0.03 260);
+  --primary-wash:oklch(0.30 0.045 260);
+  --danger:oklch(0.72 0.15 25);
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1060px;margin:0 auto;padding:24px 20px 96px}
+h1,h2{margin:0;font-weight:600;letter-spacing:-.011em}
+h1{font-size:1.0625rem}
+h2{font-size:1.25rem}
+p{margin:0}
+
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-height:38px;padding:0 14px;border:1px solid var(--line-strong);
+  border-radius:var(--radius);background:var(--surface);font-size:.875rem;
+  transition:background 160ms var(--ease),border-color 160ms var(--ease)}
+.btn:hover{background:var(--sunken)}
+.btn:active{background:var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--primary-ink);font-weight:550}
+.btn.primary:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
+.btn.icon{min-width:38px;padding:0 9px}
+
+input[type=text],input[type=number]{
+  min-height:38px;padding:0 12px;border:1px solid var(--line-strong);
+  border-radius:var(--radius);background:var(--bg);color:var(--ink);font:inherit;font-size:.9375rem;
+  transition:border-color 160ms var(--ease)}
+input::placeholder{color:var(--muted);opacity:1}
+input:hover{border-color:var(--muted)}
+input:focus-visible{outline:2px solid var(--primary);outline-offset:-1px;border-color:transparent}
+
+/* ---- top bar ---- */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding-bottom:20px;margin-bottom:24px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand .sub{color:var(--muted);font-size:.8125rem}
+
+/* ---- today ---- */
+.today{margin-bottom:36px}
+.today-head{display:flex;align-items:baseline;justify-content:space-between;
+  gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.today-head .count{color:var(--muted);font-size:.875rem}
+.ticks{display:flex;flex-direction:column;gap:8px}
+.tick{position:relative;display:flex;align-items:center;gap:14px;min-height:var(--tap);
+  padding:8px 16px 8px 14px;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--surface);cursor:pointer;
+  transition:border-color 160ms var(--ease),background 160ms var(--ease)}
+.tick:hover{border-color:var(--line-strong)}
+.tick:has(:checked){background:var(--primary-wash);border-color:transparent}
+.tick:has(:focus-visible){outline:2px solid var(--primary);outline-offset:2px}
+.tick input{position:absolute;width:1px;height:1px;opacity:0;margin:0}
+.box{flex:none;width:24px;height:24px;border:1.5px solid var(--line-strong);
+  border-radius:7px;background:var(--bg);display:grid;place-content:center;
+  transition:background 160ms var(--ease),border-color 160ms var(--ease)}
+.box svg{width:15px;height:15px;stroke:var(--primary-ink);stroke-width:2.75;
+  fill:none;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:20;stroke-dashoffset:20;
+  transition:stroke-dashoffset 220ms var(--ease)}
+.tick input:checked + .box{background:var(--primary);border-color:var(--primary)}
+.tick input:checked + .box svg{stroke-dashoffset:0}
+.tick .label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tick .run{flex:none;font-size:.8125rem;color:var(--muted)}
+.tick:has(:checked) .run{color:var(--ink)}
+
+/* ---- month ---- */
+.month-head{display:flex;align-items:center;justify-content:space-between;
+  gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.nav{display:flex;align-items:center;gap:6px}
+.nav .name{min-width:9.5ch;text-align:center;font-size:.9375rem;font-weight:550}
+.monthly{display:flex;align-items:center;gap:18px;margin-bottom:18px;flex-wrap:wrap}
+.pie{margin:0;display:flex;align-items:center;gap:10px;flex:none}
+.pie svg{display:block}
+.pie figcaption{font-size:1.125rem;font-weight:600;letter-spacing:-.011em}
+.summary{color:var(--muted);font-size:.875rem;flex:1;min-width:min(100%,26ch);max-width:70ch}
+.summary b{color:var(--ink);font-weight:600}
+
+.scroll{overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:6px}
+.grid{display:grid;
+  grid-template-columns:clamp(150px,26vw,230px) repeat(var(--days),minmax(19px,1fr));
+  gap:4px;align-items:center;min-width:660px}
+.dnum{font-size:.6875rem;color:var(--muted);text-align:center;padding-bottom:4px}
+.dnum.now{color:var(--primary);font-weight:650}
+
+/* the name column stays put while the days scroll under it -- on a phone the
+   grid is always wider than the screen, and an unlabelled row is useless */
+.hrow,.corner{position:sticky;left:0;z-index:1;background:var(--bg)}
+.hrow{display:flex;align-items:center;gap:8px;padding-right:12px;min-width:0;
+  box-shadow:7px 0 7px -7px oklch(0 0 0/.16)}
+.hrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9375rem}
+.hrow .n{flex:none;font-size:.75rem;color:var(--muted)}
+.del{flex:none;width:26px;height:26px;border-radius:6px;color:var(--muted);
+  display:grid;place-content:center;opacity:0;
+  transition:opacity 140ms var(--ease),color 140ms var(--ease),background 140ms var(--ease)}
+.del svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round}
+.hrow:hover .del,.del:focus-visible{opacity:1}
+.del:hover{color:var(--danger);background:var(--sunken)}
+
+.cell{width:100%;aspect-ratio:1;min-height:19px;border-radius:5px;
+  background:var(--sunken);border:1px solid transparent;
+  transition:background 140ms var(--ease),border-color 140ms var(--ease),transform 140ms var(--ease)}
+.cell:hover{border-color:var(--line-strong)}
+.cell[aria-pressed=true]{background:var(--primary);border-color:var(--primary)}
+.cell:active{transform:scale(.88)}
+.cell.now{outline:1.5px solid var(--ink);outline-offset:1.5px}
+.cell.future:not([aria-pressed=true]){background:transparent;border:1px dashed var(--line)}
+
+/* per-day and per-week tallies: aggregates use the same indigo as a tick,
+   but sized down -- an individual tick must stay the loudest mark on the page */
+.tally{margin-top:10px}
+.tally .nm{color:var(--muted);font-size:.8125rem}
+.col{height:26px;margin-top:10px;display:flex;align-items:flex-end}
+.col i{display:block;width:100%;min-height:2px;background:var(--primary);border-radius:3px 3px 0 0}
+.col i.zero{background:var(--line);height:2px!important}
+.week{display:flex;align-items:center;gap:6px;margin-top:10px;min-width:0}
+.wtrack{flex:1;min-width:0;height:6px;border-radius:99px;background:var(--sunken);overflow:hidden}
+.wtrack i{display:block;height:100%;background:var(--primary);border-radius:99px}
+.wpct{flex:none;font-size:.625rem;color:var(--muted)}
+
+.foot{display:flex;align-items:center;gap:10px;margin-top:12px;
+  padding-top:12px;border-top:1px solid var(--line);
+  color:var(--muted);font-size:.8125rem;flex-wrap:wrap}
+.foot .sp{flex:1}
+
+/* ---- add + empty ---- */
+.add{display:flex;gap:10px;flex-wrap:wrap;margin-top:28px}
+.add .name{flex:1;min-width:190px}
+.add .pts{width:74px}
+.empty{border:1px dashed var(--line-strong);border-radius:var(--radius);
+  padding:28px 22px;text-align:center;color:var(--muted);max-width:52ch;margin:0 auto}
+.empty h2{color:var(--ink);margin-bottom:8px;font-size:1.0625rem}
+
+.toast{position:fixed;left:50%;bottom:24px;translate:-50% 0;z-index:var(--z-toast);
+  background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:99px;
+  font-size:.875rem;box-shadow:0 6px 24px oklch(0 0 0/.22);
+  opacity:0;transition:opacity 200ms var(--ease),translate 200ms var(--ease)}
+.toast.on{opacity:1;translate:-50% -6px}
+
+@media (max-width:560px){
+  .wrap{padding:18px 14px 80px}
+  .today-head h2{font-size:1.125rem}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:1ms!important;animation-duration:1ms!important}
+  .cell:active{transform:none}
+  .box svg{transition:none}
+}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <h1>Habits</h1>
+      <span class="sub" id="stored"></span>
+    </div>
+    <button class="btn icon" id="theme" aria-label="Switch to dark theme" title="Switch theme">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" aria-hidden="true" id="theme-icon"></svg>
+    </button>
+  </div>
+
+  <main id="app"></main>
+
+  <form class="add" id="add" hidden>
+    <input class="name" type="text" name="habit" maxlength="60" required
+           placeholder="Add a habit — e.g. Read 10 pages" aria-label="Habit name">
+    <input class="pts" type="number" name="points" min="0" max="99" step="1" value="1"
+           aria-label="Points per completion" title="Points per completion">
+    <button class="btn primary" type="submit">Add</button>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+var KEY = 'habits.v1', THEME_KEY = 'habits.theme', DAY = 86400000;
+
+/* ---------- dates ------------------------------------------------------
+   Days are compared as integer day numbers (UTC-derived) so a daylight-saving
+   shift can't make two calendar days look 23 or 25 hours apart and split a run. */
+function pad(n){ return n < 10 ? '0' + n : '' + n; }
+function iso(d){ return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function dayNum(ds){ var p = ds.split('-'); return Date.UTC(+p[0], p[1] - 1, +p[2]) / DAY; }
+function fromDayNum(n){ return new Date(n * DAY).toISOString().slice(0, 10); }
+function monthDays(ym){ return new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate(); }
+function shiftMonth(ym, by){
+  var d = new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + by, 1);
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1);
+}
+function key(id, ds){ return id + '|' + ds; }
+
+/* ---------- streaks ----------------------------------------------------
+   A run ending today. An unticked today doesn't break it yet -- the day is
+   still in play -- so counting starts one day back when today is empty.
+   Runs across month boundaries; a per-month scan would report them short. */
+function currentStreak(has, today){
+  var n = dayNum(today);
+  if (!has(fromDayNum(n))) n--;
+  var c = 0;
+  while (has(fromDayNum(n))){ c++; n--; }
+  return c;
+}
+function bestStreak(dates){
+  var ns = dates.map(dayNum).sort(function(a, b){ return a - b; });
+  var best = 0, run = 0, prev = null;
+  for (var i = 0; i < ns.length; i++){
+    if (ns[i] === prev) continue;
+    run = (prev !== null && ns[i] === prev + 1) ? run + 1 : 1;
+    if (run > best) best = run;
+    prev = ns[i];
+  }
+  return best;
+}
+
+/* ---------- derived view of the data ---------------------------------- */
+function summarize(state, ym, today){
+  var days = monthDays(ym), ticks = state.ticks, habits = [];
+
+  state.habits.forEach(function(h){
+    var done = [], count = 0, dates = [], pre = h.id + '|';
+    for (var d = 0; d < days; d++){
+      var on = !!ticks[key(h.id, ym + '-' + pad(d + 1))];
+      done.push(on);
+      if (on) count++;
+    }
+    for (var k in ticks) if (k.slice(0, pre.length) === pre) dates.push(k.slice(pre.length));
+    habits.push({
+      id: h.id, name: h.name, points: h.points, done: done, count: count,
+      doneToday: !!ticks[key(h.id, today)],
+      streak: currentStreak(function(ds){ return !!ticks[key(h.id, ds)]; }, today),
+      best: bestStreak(dates)
+    });
+  });
+
+  var perDay = [], ptsPerDay = [];
+  for (var d = 0; d < days; d++){
+    var n = 0, p = 0;
+    habits.forEach(function(x){ if (x.done[d]){ n++; p += x.points; } });
+    perDay.push(n); ptsPerDay.push(p);
+  }
+
+  var allDates = [];
+  for (var k in ticks) allDates.push(k.slice(k.indexOf('|') + 1));
+
+  var total = habits.reduce(function(s, x){ return s + x.count; }, 0);
+  var slots = habits.length * days;
+
+  // Share of each day's habits that got done.
+  var dayPct = perDay.map(function(n){ return habits.length ? n / habits.length * 100 : 0; });
+
+  // Weeks are fixed 7-day blocks counted from the 1st -- the way the source
+  // spreadsheet counts them -- so the last block is whatever the month has left
+  // (3 days in a 31-day month, 2 in a 30-day one). Not ISO weeks: the columns
+  // have to line up with the grid above them.
+  var weeks = [];
+  for (var start = 0; start < days; start += 7){
+    var len = Math.min(7, days - start), done = 0;
+    for (var d = start; d < start + len; d++) done += perDay[d];
+    var wslots = habits.length * len;
+    weeks.push({
+      n: weeks.length + 1, start: start, len: len, done: done, slots: wslots,
+      pct: wslots ? done / wslots * 100 : 0
+    });
+  }
+
+  return {
+    ym: ym, days: days, habits: habits, perDay: perDay, ptsPerDay: ptsPerDay,
+    dayPct: dayPct, weeks: weeks,
+    total: total, slots: slots, pct: slots ? total / slots * 100 : 0,
+    points: ptsPerDay.reduce(function(a, b){ return a + b; }, 0),
+    bestDay: habits.length ? Math.max.apply(null, perDay) : 0,
+    doneToday: habits.filter(function(x){ return x.doneToday; }).length,
+    today: today.slice(0, 7) === ym ? +today.slice(8) - 1 : -1,
+    streak: currentStreak(function(ds){
+      return state.habits.some(function(h){ return !!ticks[key(h.id, ds)]; });
+    }, today),
+    bestStreak: bestStreak(allDates)
+  };
+}
+
+function plural(n, one, many){ return n + ' ' + (n === 1 ? one : many); }
+
+// One decimal, but never a trailing ".0" -- "100%" not "100.0%".
+function pct(n){ return (Math.round(n * 10) / 10).toFixed(1).replace(/\.0$/, '') + '%'; }
+
+// SVG path for a pie wedge of `frac` (0..1), starting at 12 o'clock, clockwise.
+// A full circle can't be drawn as one arc -- the start and end points would be
+// identical and the renderer draws nothing -- so it closes 0.01 short.
+function wedge(cx, cy, r, frac){
+  if (frac <= 0) return '';
+  if (frac >= 1)
+    return 'M ' + cx + ' ' + (cy - r) +
+           ' A ' + r + ' ' + r + ' 0 1 1 ' + (cx - 0.01).toFixed(2) + ' ' + (cy - r) + ' Z';
+  var a = frac * 2 * Math.PI;
+  return 'M ' + cx + ' ' + cy +
+         ' L ' + cx + ' ' + (cy - r) +
+         ' A ' + r + ' ' + r + ' 0 ' + (frac > 0.5 ? 1 : 0) + ' 1 ' +
+         (cx + r * Math.sin(a)).toFixed(2) + ' ' + (cy - r * Math.cos(a)).toFixed(2) + ' Z';
+}
+
+/* ---------- state ------------------------------------------------------
+   ponytail: localStorage. No server, no account, no sync -- which is also why
+   Export exists: this is the only copy, and it lives in one browser profile. */
+function load(){
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY));
+    if (s && Array.isArray(s.habits) && s.ticks) return s;
+  } catch (e) {}
+  return {habits: [], ticks: {}};
+}
+
+var state = load();
+var ym = iso(new Date()).slice(0, 7);
+var app = document.getElementById('app');
+
+function save(){
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    document.getElementById('stored').textContent =
+      state.habits.length ? 'saved on this device' : '';
+  } catch (e) {
+    toast('Could not save — ' + e.message);
+  }
+}
+
+var toastTimer;
+function toast(msg){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove('on'); }, 2600);
+}
+
+/* ---------- render ----------------------------------------------------- */
+function el(tag, cls, txt){
+  var n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (txt != null) n.textContent = txt;
+  return n;
+}
+var CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5l5 5 10-11"/></svg>';
+var CROSS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>';
+
+function render(){
+  var todayIso = iso(new Date());
+  var s = summarize(state, ym, todayIso);
+  app.innerHTML = '';
+  document.getElementById('add').hidden = false;
+
+  if (!state.habits.length){
+    var e = el('section', 'empty');
+    e.appendChild(el('h2', null, 'Nothing tracked yet'));
+    e.appendChild(el('p', null,
+      'Add a habit below and it appears here every day, ready to tick off. ' +
+      'Each tick is recorded against its date, so the month grid and your runs build themselves.'));
+    app.appendChild(e);
+    return;
+  }
+
+  /* today ------------------------------------------------------------- */
+  var today = el('section', 'today');
+  var th = el('div', 'today-head');
+  var d = new Date();
+  th.appendChild(el('h2', null,
+    d.toLocaleDateString(undefined, {weekday: 'long', day: 'numeric', month: 'long'})));
+  th.appendChild(el('span', 'count',
+    s.doneToday + ' of ' + plural(s.habits.length, 'habit', 'habits') + ' done'));
+  today.appendChild(th);
+
+  var ticks = el('div', 'ticks');
+  s.habits.forEach(function(h){
+    var row = el('label', 'tick');
+    var cb = el('input');
+    cb.type = 'checkbox';
+    cb.checked = h.doneToday;
+    cb.dataset.k = key(h.id, todayIso);
+    var box = el('span', 'box');
+    box.innerHTML = CHECK;
+    row.appendChild(cb);
+    row.appendChild(box);
+    row.appendChild(el('span', 'label', h.name));
+    row.appendChild(el('span', 'run', h.streak
+      ? plural(h.streak, 'day', 'days') + ' running'
+      : (h.best ? 'best ' + plural(h.best, 'day', 'days') : '')));
+    ticks.appendChild(row);
+  });
+  today.appendChild(ticks);
+  app.appendChild(today);
+
+  /* month ------------------------------------------------------------- */
+  var month = el('section');
+  var mh = el('div', 'month-head');
+  mh.appendChild(el('h2', null, 'The month'));
+  function arrow(id, label, path){
+    var b = el('button', 'btn icon');
+    b.type = 'button';
+    b.id = id;
+    b.setAttribute('aria-label', label);
+    b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+      'aria-hidden="true"><path d="' + path + '"/></svg>';
+    return b;
+  }
+  var nav = el('div', 'nav');
+  nav.appendChild(arrow('prev', 'Previous month', 'M15 5l-7 7 7 7'));
+  nav.appendChild(el('span', 'name', new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1)
+    .toLocaleDateString(undefined, {month: 'long', year: 'numeric'})));
+  nav.appendChild(arrow('next', 'Next month', 'M9 5l7 7-7 7'));
+  mh.appendChild(nav);
+  month.appendChild(mh);
+
+  var monthly = el('div', 'monthly');
+  var pieLabel = pct(s.pct) + ' of this month’s possible ticks are done — ' +
+                 s.total + ' of ' + s.slots + '.';
+  var pie = el('figure', 'pie');
+  pie.setAttribute('role', 'img');
+  pie.setAttribute('aria-label', pieLabel);
+  pie.innerHTML =
+    '<svg viewBox="0 0 100 100" width="84" height="84">' +
+      '<circle cx="50" cy="50" r="46" fill="var(--sunken)"/>' +
+      '<path d="' + wedge(50, 50, 46, s.pct / 100) + '" fill="var(--primary)"/>' +
+      '<circle cx="50" cy="50" r="46" fill="none" stroke="var(--line)" stroke-width="1"/>' +
+    '</svg>' +
+    '<figcaption>' + pct(s.pct) + '</figcaption>';
+  monthly.appendChild(pie);
+
+  var sum = el('p', 'summary');
+  sum.innerHTML = '<b>' + pct(s.pct) + '</b> of the month done — <b>' + s.total +
+    '</b> of ' + s.slots + ' possible ticks' +
+    (s.points ? ', <b>' + s.points + '</b> points' : '') +
+    '. Longest run so far <b>' + plural(s.bestStreak, 'day', 'days') + '</b>' +
+    (s.streak ? ', currently on <b>' + plural(s.streak, 'day', 'days') + '</b>' : '') + '.';
+  monthly.appendChild(sum);
+  month.appendChild(monthly);
+
+  var scroll = el('div', 'scroll'), grid = el('div', 'grid');
+  grid.style.setProperty('--days', s.days);
+  grid.appendChild(el('div', 'corner'));
+  for (var i = 0; i < s.days; i++)
+    grid.appendChild(el('div', 'dnum' + (i === s.today ? ' now' : ''), String(i + 1)));
+
+  var todayNum = dayNum(todayIso);
+  s.habits.forEach(function(h){
+    var row = el('div', 'hrow');
+    row.appendChild(el('span', 'nm', h.name));
+    row.appendChild(el('span', 'n', h.count + '/' + s.days));
+    var del = el('button', 'del');
+    del.type = 'button';
+    del.dataset.del = h.id;
+    del.setAttribute('aria-label', 'Delete habit: ' + h.name);
+    del.innerHTML = CROSS;
+    row.appendChild(del);
+    grid.appendChild(row);
+
+    for (var i = 0; i < s.days; i++){
+      var ds = ym + '-' + pad(i + 1);
+      var c = el('button', 'cell' + (i === s.today ? ' now' : '') +
+        (dayNum(ds) > todayNum ? ' future' : ''));
+      c.type = 'button';
+      c.dataset.k = key(h.id, ds);
+      c.setAttribute('aria-pressed', h.done[i] ? 'true' : 'false');
+      c.setAttribute('aria-label', h.name + ', ' + ds);
+      grid.appendChild(c);
+    }
+  });
+  // Per-day and per-week progress ride the grid's own columns, so each figure
+  // sits directly under the days it counts.
+  var perDayLabel = el('div', 'hrow tally');
+  perDayLabel.appendChild(el('span', 'nm', 'Per day'));
+  grid.appendChild(perDayLabel);
+  for (var i = 0; i < s.days; i++){
+    var col = el('div', 'col'), bar = el('i');
+    bar.style.height = s.dayPct[i] + '%';
+    if (!s.perDay[i]) bar.className = 'zero';
+    col.title = 'Day ' + (i + 1) + ' — ' + s.perDay[i] + ' of ' + s.habits.length +
+                ' habits, ' + Math.round(s.dayPct[i]) + '%';
+    col.setAttribute('aria-hidden', 'true');   // restates the grid above it
+    col.appendChild(bar);
+    grid.appendChild(col);
+  }
+
+  var weekLabel = el('div', 'hrow tally');
+  weekLabel.appendChild(el('span', 'nm', 'Per week'));
+  grid.appendChild(weekLabel);
+  s.weeks.forEach(function(w){
+    var seg = el('div', 'week');
+    seg.style.gridColumn = 'span ' + w.len;
+    var desc = 'Week ' + w.n + ' (days ' + (w.start + 1) + '–' + (w.start + w.len) +
+               ') — ' + w.done + ' of ' + w.slots + ' ticks, ' + Math.round(w.pct) + '%';
+    seg.title = desc;
+    seg.setAttribute('role', 'img');
+    seg.setAttribute('aria-label', desc);
+    var track = el('div', 'wtrack'), fill = el('i');
+    fill.style.width = w.pct + '%';
+    track.appendChild(fill);
+    seg.appendChild(el('span', 'wpct', Math.round(w.pct) + '%'));  // reads at the block's start
+    seg.appendChild(track);
+    grid.appendChild(seg);
+  });
+
+  scroll.appendChild(grid);
+  month.appendChild(scroll);
+
+  var foot = el('div', 'foot');
+  foot.appendChild(el('span', null, 'Best day: ' + s.bestDay + ' of ' + s.habits.length));
+  foot.appendChild(el('span', 'sp'));
+  ['Export', 'Import'].forEach(function(t){
+    var b = el('button', 'btn', t);
+    b.type = 'button';
+    b.id = t.toLowerCase();
+    foot.appendChild(b);
+  });
+  month.appendChild(foot);
+  app.appendChild(month);
+}
+
+/* ---------- events ----------------------------------------------------- */
+function toggle(k){
+  if (state.ticks[k]) delete state.ticks[k];
+  else state.ticks[k] = 1;
+  save();
+  render();
+}
+
+app.addEventListener('click', function(e){
+  var t = e.target.closest('[data-del],[data-k],#prev,#next,#export,#import');
+  if (!t) return;
+  if (t.dataset.del){
+    var h = state.habits.find(function(x){ return x.id === t.dataset.del; });
+    if (!confirm('Delete "' + h.name + '" and every tick recorded against it?')) return;
+    var pre = h.id + '|';
+    state.habits = state.habits.filter(function(x){ return x.id !== h.id; });
+    for (var k in state.ticks) if (k.slice(0, pre.length) === pre) delete state.ticks[k];
+    save(); render();
+    toast('Deleted "' + h.name + '"');
+  }
+  else if (t.id === 'prev'){ ym = shiftMonth(ym, -1); render(); }
+  else if (t.id === 'next'){ ym = shiftMonth(ym, 1); render(); }
+  else if (t.id === 'export') exportBackup();
+  else if (t.id === 'import') document.getElementById('file').click();
+  else if (t.tagName === 'BUTTON' && t.dataset.k) toggle(t.dataset.k);
+});
+
+/* checkboxes fire change, not click-with-dataset */
+app.addEventListener('change', function(e){
+  if (e.target.dataset.k) toggle(e.target.dataset.k);
+});
+
+document.getElementById('add').addEventListener('submit', function(e){
+  e.preventDefault();
+  var f = this.elements;
+  var name = f.habit.value.trim();
+  if (!name) return;
+  state.habits.push({
+    id: 'h' + Date.now().toString(36),
+    name: name,
+    points: Math.max(0, Math.min(99, Math.round(+f.points.value) || 0))
+  });
+  f.habit.value = '';
+  f.points.value = 1;
+  f.habit.focus();
+  save(); render();
+});
+
+/* ---------- backup ------------------------------------------------------ */
+function exportBackup(){
+  var a = el('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)],
+    {type: 'application/json'}));
+  a.download = 'habits-' + iso(new Date()) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Backup downloaded');
+}
+
+var file = el('input');
+file.type = 'file';
+file.id = 'file';
+file.accept = 'application/json,.json';
+file.hidden = true;
+document.body.appendChild(file);
+file.addEventListener('change', function(){
+  var f = this.files[0];
+  this.value = '';
+  if (!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    try {
+      var s = JSON.parse(r.result);
+      if (!s || !Array.isArray(s.habits) || !s.ticks) throw new Error('not a Habits backup');
+      if (!confirm('Replace ' + plural(state.habits.length, 'habit', 'habits') +
+                   ' with ' + plural(s.habits.length, 'habit', 'habits') + ' from this file?')) return;
+      state = s;
+      save(); render();
+      toast('Backup restored');
+    } catch (err){ toast('Import failed — ' + err.message); }
+  };
+  r.readAsText(f);
+});
+
+/* ---------- theme ------------------------------------------------------- */
+var SUN = '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M4.3 4.3l1.6 1.6' +
+  'M18.1 18.1l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.3 19.7l1.6-1.6M18.1 5.9l1.6-1.6"/>';
+var MOON = '<path d="M20 14.3A8.4 8.4 0 1 1 9.7 4a6.6 6.6 0 0 0 10.3 10.3z"/>';
+
+function applyTheme(){
+  var t = localStorage.getItem(THEME_KEY);
+  if (t) document.documentElement.dataset.theme = t;
+  else delete document.documentElement.dataset.theme;
+  var dark = t ? t === 'dark'
+    : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.getElementById('theme-icon').innerHTML = dark ? SUN : MOON;
+  document.getElementById('theme').setAttribute('aria-label',
+    'Switch to ' + (dark ? 'light' : 'dark') + ' theme');
+}
+document.getElementById('theme').onclick = function(){
+  var dark = document.documentElement.dataset.theme
+    ? document.documentElement.dataset.theme === 'dark'
+    : matchMedia('(prefers-color-scheme: dark)').matches;
+  try { localStorage.setItem(THEME_KEY, dark ? 'light' : 'dark'); } catch (e) {}
+  applyTheme();
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+
+applyTheme();
+save();
+render();
+</script>
+</html>

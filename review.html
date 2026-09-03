@@ -140,21 +140,62 @@ td.topic{overflow-wrap:anywhere;min-width:150px}
 td.num{white-space:nowrap;color:var(--muted)}
 td.when{white-space:nowrap}
 td.when.now{color:var(--primary);font-weight:600}
-.del{width:26px;height:26px;border-radius:6px;color:var(--muted);display:grid;
-  place-content:center;opacity:.5;transition:opacity 140ms var(--ease),color 140ms var(--ease)}
-tr:hover .del,.del:focus-visible{opacity:1}
+.rowacts{display:flex;gap:2px;justify-content:flex-end}
+.iconbtn{width:26px;height:26px;border-radius:6px;color:var(--muted);display:grid;
+  place-content:center;opacity:.5;
+  transition:opacity 140ms var(--ease),color 140ms var(--ease),background 140ms var(--ease)}
+tr:hover .iconbtn,.iconbtn:focus-visible{opacity:1}
+.iconbtn:hover{color:var(--ink);background:var(--sunken)}
 .del:hover{color:var(--danger);background:var(--sunken)}
-.del svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round}
+.iconbtn svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+/* touch has no hover, so pin the row controls visible there */
+@media (hover:none){.iconbtn{opacity:1}}
+
+/* snooze: a neutral "not today" that pushes the due date without logging a recall.
+   Kept visually apart from the three rating buttons so it never reads as a fourth verdict. */
+.cardfoot{display:flex;justify-content:flex-end;margin-top:10px}
+.snooze{min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:var(--radius);
+  background:transparent;color:var(--muted);font-size:.8125rem;cursor:pointer;
+  transition:background 140ms var(--ease),color 140ms var(--ease),border-color 140ms var(--ease)}
+.snooze:hover{background:var(--sunken);color:var(--ink);border-color:var(--line-strong)}
+.snooze:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.cardhint{color:var(--muted);font-size:.6875rem;margin-top:10px}
+.cardhint kbd{font:inherit;border:1px solid var(--line-strong);border-radius:4px;
+  padding:0 4px;color:var(--ink)}
 
 .foot{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:14px;
   border-top:1px solid var(--line);color:var(--muted);font-size:.8125rem;flex-wrap:wrap}
 .foot .sp{flex:1}
 
+/* ---- google sheet sync (shares one deployment + secret with Habits) ---- */
+.sync{margin-top:36px;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--surface);font-size:.875rem}
+.sync summary{padding:12px 16px;cursor:pointer;color:var(--muted);border-radius:var(--radius)}
+.sync summary:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.sync #syncstate{color:var(--ink)}
+.sync #syncstate.bad{color:var(--danger)}
+.sync form{padding:0 16px 16px;display:flex;flex-direction:column;gap:12px}
+.sync label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:.8125rem}
+.sync input{width:100%}
+.syncbtns{display:flex;gap:10px;flex-wrap:wrap}
+.synchelp{color:var(--muted);font-size:.75rem;max-width:60ch}
+.synchelp a{color:var(--primary)}
+.reveal{display:flex;gap:8px;align-items:center}
+.reveal input{flex:1;min-width:0}
+.reveal button{flex:none;font-size:.75rem;color:var(--muted);padding:6px 8px;border-radius:6px}
+.reveal button:hover{color:var(--ink);background:var(--sunken)}
+
 .toast{position:fixed;left:50%;bottom:24px;translate:-50% 0;z-index:var(--z-toast);
   background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:99px;
   font-size:.875rem;box-shadow:0 6px 24px oklch(0 0 0/.22);
+  display:inline-flex;align-items:center;gap:12px;max-width:calc(100vw - 28px);
   opacity:0;transition:opacity 200ms var(--ease),translate 200ms var(--ease)}
 .toast.on{opacity:1;translate:-50% -6px}
+.toast .act{flex:none;appearance:none;font:inherit;font-weight:600;color:inherit;
+  background:transparent;border:1px solid color-mix(in oklch,currentColor 40%,transparent);
+  border-radius:99px;padding:3px 11px;cursor:pointer;transition:background 140ms var(--ease)}
+.toast .act:hover{background:color-mix(in oklch,currentColor 16%,transparent)}
+.toast .act:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 
 @media (max-width:560px){
   .wrap{padding:18px 14px 80px}
@@ -185,10 +226,35 @@ tr:hover .del,.del:focus-visible{opacity:1}
            placeholder="What did you learn? — e.g. TCP handshake" aria-label="Topic">
     <input class="notes" type="text" name="notes" maxlength="400"
            placeholder="Notes or a link (optional)" aria-label="Notes or source link">
-    <button class="btn primary" type="submit">Add</button>
+    <button class="btn primary" type="submit" id="addsubmit">Add</button>
+    <button class="btn" type="button" id="addcancel" hidden>Cancel</button>
   </form>
 
   <section id="all"></section>
+
+  <details class="sync">
+    <summary>Google Sheet sync — <span id="syncstate">not connected</span></summary>
+    <form id="syncform" onsubmit="return false">
+      <label>Web app URL
+        <input type="url" name="url" placeholder="https://script.google.com/macros/s/…/exec"
+               autocomplete="off" spellcheck="false"></label>
+      <label>Shared secret
+        <span class="reveal">
+          <input type="password" name="secret" autocomplete="off" spellcheck="false">
+          <button type="button" id="syncshow" aria-label="Show secret">Show</button>
+        </span></label>
+      <div class="syncbtns">
+        <button class="btn primary" type="button" id="syncsave">Save &amp; sync</button>
+        <button class="btn" type="button" id="syncnow">Sync now</button>
+      </div>
+      <p class="synchelp">Review shares the same sheet and secret as
+        <a href="index.html">Habits</a> — it syncs to a <b>review</b> tab in that sheet. Set the
+        URL and secret up once on <a href="index.html">Habits</a> (it has the full guide and a
+        device-link button) and this page picks them up automatically. Stored on this device only.
+        <b>Already synced Habits before?</b> Re-deploy the Apps Script once — the copy button on the
+        Habits page now emits a version that also handles Review.</p>
+    </form>
+  </details>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -309,12 +375,25 @@ function save(){
 }
 
 var toastTimer;
-function toast(msg){
+// Optional {label, fn} second arg renders an Undo button on the toast; text is
+// added via textContent/appendChild so a topic name can never become markup.
+function toast(msg, action){
   var t = document.getElementById('toast');
-  t.textContent = msg;
+  t.textContent = '';
+  t.appendChild(document.createTextNode(msg));
+  if (action && action.label && typeof action.fn === 'function'){
+    var b = el('button', 'act', action.label);
+    b.type = 'button';
+    b.addEventListener('click', function(){
+      clearTimeout(toastTimer);
+      t.classList.remove('on');
+      action.fn();
+    });
+    t.appendChild(b);
+  }
   t.classList.add('on');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(function(){ t.classList.remove('on'); }, 2600);
+  toastTimer = setTimeout(function(){ t.classList.remove('on'); }, action ? 6000 : 2600);
 }
 
 /* ---------- render ----------------------------------------------------- */
@@ -325,6 +404,7 @@ function el(tag, cls, txt){
   return n;
 }
 var CROSS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>';
+var PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17z"/><path d="M13.5 6.5l3 3"/></svg>';
 var RATINGS = [
   ['blanked',   'Blanked',   'start over'],
   ['struggled', 'Struggled', 'small step'],
@@ -380,7 +460,7 @@ function render(){
     app.appendChild(e);
   } else {
     var cards = el('div', 'cards');
-    s.due.forEach(function(t){
+    s.due.forEach(function(t, idx){
       var c = el('div', 'card');
       c.appendChild(el('div', 'name', t.topic));
 
@@ -404,6 +484,22 @@ function render(){
         rate.appendChild(b);
       });
       c.appendChild(rate);
+
+      // snooze pushes the due date to tomorrow without logging a recall -- for
+      // when something is due but you're not ready to test it today
+      var cf = el('div', 'cardfoot');
+      var sn = el('button', 'snooze', 'Snooze to tomorrow');
+      sn.type = 'button';
+      sn.dataset.snooze = t.id;
+      cf.appendChild(sn);
+      c.appendChild(cf);
+
+      // number keys rate the top card only, so its hint is the only one shown
+      if (idx === 0){
+        var hint = el('p', 'cardhint');
+        hint.innerHTML = 'Keys <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> rate this card.';
+        c.appendChild(hint);
+      }
       cards.appendChild(c);
     });
     app.appendChild(cards);
@@ -441,12 +537,20 @@ function renderAll(today){
       tr.appendChild(el('td', 'num', String((t.reviews || []).length)));
 
       var last = el('td', 'num');
-      var d = el('button', 'del');
+      var acts = el('div', 'rowacts');
+      var ed = el('button', 'iconbtn');
+      ed.type = 'button';
+      ed.dataset.edit = t.id;
+      ed.setAttribute('aria-label', 'Edit topic: ' + t.topic);
+      ed.innerHTML = PENCIL;
+      var d = el('button', 'iconbtn del');
       d.type = 'button';
       d.dataset.del = t.id;
       d.setAttribute('aria-label', 'Delete topic: ' + t.topic);
       d.innerHTML = CROSS;
-      last.appendChild(d);
+      acts.appendChild(ed);
+      acts.appendChild(d);
+      last.appendChild(acts);
       tr.appendChild(last);
       tbody.appendChild(tr);
     });
@@ -467,43 +571,135 @@ function renderAll(today){
 }
 
 /* ---------- events ----------------------------------------------------- */
+// Rating is reused by both the buttons and the number-key shortcuts. The pre-review
+// topic is snapshotted so the toast can offer a one-tap Undo.
+function rateTopic(id, rating){
+  var today = iso(new Date());
+  var i = topics.findIndex(function(x){ return x.id === id; });
+  if (i < 0) return;
+  var snap = JSON.parse(JSON.stringify(topics[i]));
+  topics[i] = applyReview(topics[i], rating, today);
+  var after = topics[i];
+  save(); render(); queueSync();
+  toast(after.topic + ' — back in ' + plural(after.interval, 'day', 'days') +
+        (after.interval < snap.interval ? ' (reset)' : ''),
+        {label: 'Undo', fn: function(){ undoTopic(id, snap); }});
+}
+
+// Push the due date to tomorrow without recording a recall -- not a fourth verdict.
+function snoozeTopic(id){
+  var today = iso(new Date());
+  var i = topics.findIndex(function(x){ return x.id === id; });
+  if (i < 0) return;
+  var snap = JSON.parse(JSON.stringify(topics[i]));
+  var t = topics[i];
+  topics[i] = {
+    id: t.id, topic: t.topic, notes: t.notes, created: t.created,
+    interval: t.interval, nextDue: addDays(today, 1), reviews: t.reviews
+  };
+  save(); render(); queueSync();
+  toast('“' + t.topic + '” — snoozed to tomorrow',
+        {label: 'Undo', fn: function(){ undoTopic(id, snap); }});
+}
+
+// Restore a topic to a pre-change snapshot (rating or snooze).
+function undoTopic(id, snap){
+  var i = topics.findIndex(function(x){ return x.id === id; });
+  if (i < 0) topics.push(snap); else topics[i] = snap;
+  save(); render(); queueSync();
+}
+
+/* The add form doubles as the edit form: editingId null means "add a new topic",
+   otherwise the same fields write back to that topic. Interval/due are managed by
+   rating and snooze, not the form, so editing only touches the text. */
+var editingId = null;
+var addForm = document.getElementById('add');
+
+function startEdit(id){
+  var x = topics.find(function(t){ return t.id === id; });
+  if (!x) return;
+  editingId = id;
+  var f = addForm.elements;
+  f.topic.value = x.topic;
+  f.notes.value = x.notes || '';
+  document.getElementById('addsubmit').textContent = 'Save';
+  document.getElementById('addcancel').hidden = false;
+  addForm.scrollIntoView({block: 'nearest'});
+  f.topic.focus();
+  f.topic.select();
+}
+
+function cancelEdit(){
+  editingId = null;
+  var f = addForm.elements;
+  f.topic.value = '';
+  f.notes.value = '';
+  document.getElementById('addsubmit').textContent = 'Add';
+  document.getElementById('addcancel').hidden = true;
+}
+
+document.getElementById('addcancel').addEventListener('click', cancelEdit);
+
 document.addEventListener('click', function(e){
-  var t = e.target.closest('[data-rate],[data-del],#export,#import');
+  var t = e.target.closest('[data-rate],[data-snooze],[data-edit],[data-del],#export,#import');
   if (!t) return;
 
-  if (t.dataset.rate){
-    var today = iso(new Date());
-    var i = topics.findIndex(function(x){ return x.id === t.dataset.id; });
-    if (i < 0) return;
-    var before = topics[i].interval;
-    topics[i] = applyReview(topics[i], t.dataset.rate, today);
-    save(); render();
-    toast(topics[i].topic + ' — back in ' + plural(topics[i].interval, 'day', 'days') +
-          (topics[i].interval < before ? ' (reset)' : ''));
-  }
+  if (t.dataset.rate) rateTopic(t.dataset.id, t.dataset.rate);
+  else if (t.dataset.snooze) snoozeTopic(t.dataset.snooze);
+  else if (t.dataset.edit) startEdit(t.dataset.edit);
   else if (t.dataset.del){
     var x = topics.find(function(y){ return y.id === t.dataset.del; });
     if (!x || !confirm('Delete “' + x.topic + '” and its review history?')) return;
-    topics = topics.filter(function(y){ return y.id !== x.id; });
-    save(); render();
-    toast('Deleted “' + x.topic + '”');
+    if (editingId === x.id) cancelEdit();
+    var snap = JSON.parse(JSON.stringify(x));
+    var id = x.id;
+    topics = topics.filter(function(y){ return y.id !== id; });
+    if (removedTopics.indexOf(id) < 0) removedTopics.push(id);   // tombstone, so the sync deletes it too
+    saveRemoved();
+    save(); render(); queueSync();
+    toast('Deleted “' + x.topic + '”', {label: 'Undo', fn: function(){
+      removedTopics = removedTopics.filter(function(r){ return r !== id; });
+      saveRemoved();
+      undoTopic(id, snap);
+    }});
   }
   else if (t.id === 'export') exportBackup();
   else if (t.id === 'import') document.getElementById('file').click();
 });
 
-document.getElementById('add').addEventListener('submit', function(e){
+// Number keys 1/2/3 rate the top due card; ignored while typing in a field.
+document.addEventListener('keydown', function(e){
+  if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+  var tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+  var rating = {'1': 'blanked', '2': 'struggled', '3': 'easy'}[e.key];
+  if (!rating) return;
+  var due = dueList(topics, iso(new Date()));
+  if (!due.length) return;
+  e.preventDefault();
+  rateTopic(due[0].id, rating);
+});
+
+addForm.addEventListener('submit', function(e){
   e.preventDefault();
   var f = this.elements;
   var name = f.topic.value.trim();
   if (!name) return;
-  topics.push(newTopic(name, f.notes.value.trim(), iso(new Date()),
-    'r' + Date.now().toString(36)));
-  f.topic.value = '';
-  f.notes.value = '';
-  f.topic.focus();
-  save(); render();
-  toast('“' + name + '” — first review tomorrow');
+  if (editingId){
+    var x = topics.find(function(t){ return t.id === editingId; });
+    if (x){ x.topic = name; x.notes = f.notes.value.trim(); }
+    cancelEdit();
+    save(); render(); queueSync();
+    toast('“' + name + '” — updated');
+  } else {
+    topics.push(newTopic(name, f.notes.value.trim(), iso(new Date()),
+      'r' + Date.now().toString(36)));
+    f.topic.value = '';
+    f.notes.value = '';
+    f.topic.focus();
+    save(); render(); queueSync();
+    toast('“' + name + '” — first review tomorrow');
+  }
 });
 
 /* ---------- backup ------------------------------------------------------ */
@@ -534,13 +730,117 @@ file.addEventListener('change', function(){
       if (!Array.isArray(s) || (s.length && !s[0].nextDue)) throw new Error('not a Review backup');
       if (!confirm('Replace ' + plural(topics.length, 'topic', 'topics') +
                    ' with ' + plural(s.length, 'topic', 'topics') + ' from this file?')) return;
+      if (editingId) cancelEdit();
       topics = s;
-      save(); render();
+      save(); render(); queueSync();
       toast('Backup restored');
     } catch (err){ toast('Import failed — ' + err.message); }
   };
   r.readAsText(f);
 });
+
+/* ---------- google sheet sync -------------------------------------------
+   Review syncs to a "review" tab in the SAME sheet as Habits, reusing the same
+   URL + secret (localStorage is shared across both pages on this origin). It
+   POSTs { review, removedTopics } and adopts remote.review; the Apps Script
+   merges by topic id and never touches the habits/ticks tabs on a Review sync.
+
+   As in Habits, the request must stay a CORS *simple* request, so text/plain is
+   mandatory -- application/json would trigger a preflight Apps Script can't answer. */
+var SYNC_URL = 'habits.sync.url', SYNC_SECRET = 'habits.sync.secret';
+var REMOVED_KEY = 'review.removed';
+var syncTimer = null, syncing = false;
+var removedTopics = loadRemoved();
+
+function loadRemoved(){
+  try { var a = JSON.parse(localStorage.getItem(REMOVED_KEY)); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function saveRemoved(){
+  try { localStorage.setItem(REMOVED_KEY, JSON.stringify(removedTopics)); } catch (e) {}
+}
+
+function syncCfg(){
+  try {
+    return {url: localStorage.getItem(SYNC_URL) || '', secret: localStorage.getItem(SYNC_SECRET) || ''};
+  } catch (e) { return {url: '', secret: ''}; }
+}
+
+function syncStatus(text, bad){
+  var n = document.getElementById('syncstate');
+  if (!n) return;
+  n.textContent = text;
+  n.className = bad ? 'bad' : '';
+}
+
+// A blocked cross-origin request is opaque, so infer the cause rather than shrug.
+function diagnose(err, url){
+  if (/bad or missing secret/.test(err.message)) return 'wrong secret — check it matches the script';
+  if (!navigator.onLine) return 'no connection — saved locally, will retry';
+  if (/\/dev(\?|$)/.test(url)) return 'that is the /dev test URL — deploy and use the /exec one';
+  if (!/\/exec(\?|$)/.test(url)) return 'URL should end in /exec';
+  return 'blocked by Google — set “Who has access: Anyone” and redeploy';
+}
+
+function queueSync(){
+  if (!syncCfg().url) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncNow, 1200);
+}
+
+function syncNow(){
+  var cfg = syncCfg();
+  if (!cfg.url){ syncStatus('not connected'); return; }
+  if (syncing){ queueSync(); return; }
+  syncing = true;
+  syncStatus('syncing…');
+
+  fetch(cfg.url + (cfg.url.indexOf('?') < 0 ? '?' : '&') + 'secret=' + encodeURIComponent(cfg.secret), {
+    method: 'POST',
+    headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify({ review: topics, removedTopics: removedTopics })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(remote){
+    if (remote.error) throw new Error(remote.error);
+    topics = remote.review || [];
+    removedTopics = [];          // the sheet has accepted the deletions
+    save(); saveRemoved(); render();
+    syncStatus('synced ' + new Date().toLocaleTimeString());
+  })
+  .catch(function(e){
+    // local data and tombstones are kept, so the next successful sync still carries them
+    syncStatus(diagnose(e, cfg.url), true);
+  })
+  .then(function(){ syncing = false; });
+}
+
+document.getElementById('syncsave').onclick = function(){
+  var f = document.getElementById('syncform').elements;
+  try {
+    localStorage.setItem(SYNC_URL, f.url.value.trim());
+    localStorage.setItem(SYNC_SECRET, f.secret.value.trim());
+    f.secret.value = f.secret.value.trim();
+  } catch (e) { return syncStatus('could not save settings', true); }
+  syncNow();
+};
+document.getElementById('syncshow').onclick = function(){
+  var i = document.getElementById('syncform').elements.secret;
+  var show = i.type === 'password';
+  i.type = show ? 'text' : 'password';
+  this.textContent = show ? 'Hide' : 'Show';
+  this.setAttribute('aria-label', (show ? 'Hide' : 'Show') + ' secret');
+};
+document.getElementById('syncnow').onclick = syncNow;
+
+(function initSync(){
+  var cfg = syncCfg(), f = document.getElementById('syncform').elements;
+  f.url.value = cfg.url;
+  f.secret.value = cfg.secret;
+  syncStatus(cfg.url ? 'connected' : 'not connected');
+  if (cfg.url) syncNow();
+  addEventListener('online', queueSync);
+})();
 
 /* ---------- theme ------------------------------------------------------- */
 var SUN = '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M4.3 4.3l1.6 1.6' +

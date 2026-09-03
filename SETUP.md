@@ -18,8 +18,8 @@ There are two independent problems here and this file solves both:
 1. Go to <https://sheets.new>. A blank spreadsheet opens.
 2. Name it something you'll recognise — `Habits data`.
 
-Leave it empty. The script creates the `habits`, `ticks` and `meta` tabs itself on
-the first sync.
+Leave it empty. The script creates the `habits`, `ticks`, `review` and `meta` tabs
+itself on the first sync.
 
 ## 2. Add the script
 
@@ -90,6 +90,19 @@ If the app is already open on that device, the link still works — it applies o
 
 A device's first sync uploads whatever it had locally and pulls down everything else.
 
+### The Review page rides the same setup
+
+The Review page (spaced-repetition recall) syncs through the **same deployment and
+secret** — it writes to the `review` tab of the same sheet. Because both pages live at
+the same address, Review reads the URL and secret you saved for Habits automatically:
+set sync up once here and open Review, and it just works. Review has its own **Google
+Sheet sync** panel too, but it edits the same shared setting.
+
+> **Already synced Habits before this update?** The script gained the `review` tab, so
+> **re-deploy it once**: press **Copy script** in the Habits page again, paste over the
+> old code, then **Deploy ▸ Manage deployments ▸ pencil ▸ Version: New version ▸ Deploy**.
+> Until you do, Habits keeps working and Review reports `wrong secret`/blocked.
+
 ## 5. Making the page reachable from your phone
 
 Pick one. The first needs no accounts; the others work anywhere.
@@ -116,8 +129,9 @@ You get an HTTPS URL immediately. Bookmark it on both devices.
 Create a repository, upload `index.html`, then **Settings ▸ Pages ▸ Source: deploy
 from branch ▸ main / (root)**. Your URL appears within a minute or two.
 
-For B and C, upload only `index.html`. Everything else in this folder is source and
-documentation — and never upload a copy of the script with your real secret in it.
+For B and C, upload `index.html` and `review.html` (they link to each other).
+Everything else in this folder is source and documentation — and never upload a copy of
+the script with your real secret in it.
 
 On a phone, use **Add to Home Screen** from the browser menu so it opens like an app.
 
@@ -147,7 +161,11 @@ a URL and secret means sharing one habit log, not having two.
 |---|---|---|
 | `habits` | `id`, `name`, `points` | habit |
 | `ticks` | `habit_id`, `date` | day you ticked something |
+| `review` | `id`, `topic`, `notes`, `created`, `interval`, `nextDue`, `reviews` | review topic |
 | `meta` | `key`, `value` | last sync time |
+
+The `reviews` column holds each topic's recall history as a JSON blob; the rest is
+plain text, dates included, for the same timezone reason as `ticks`.
 
 Dates are stored as **text**, deliberately. If Sheets parses `2026-09-01` into a real
 date, the spreadsheet's timezone can shift it a day on the round trip and silently

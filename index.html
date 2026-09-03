@@ -151,12 +151,15 @@ input:focus-visible{outline:2px solid var(--primary);outline-offset:-1px;border-
   box-shadow:7px 0 7px -7px oklch(0 0 0/.16)}
 .hrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9375rem}
 .hrow .n{flex:none;font-size:.75rem;color:var(--muted)}
-.del{flex:none;width:26px;height:26px;border-radius:6px;color:var(--muted);
+.rbtn{flex:none;width:26px;height:26px;border-radius:6px;color:var(--muted);
   display:grid;place-content:center;opacity:0;
   transition:opacity 140ms var(--ease),color 140ms var(--ease),background 140ms var(--ease)}
-.del svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round}
-.hrow:hover .del,.del:focus-visible{opacity:1}
+.rbtn svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.hrow:hover .rbtn,.rbtn:focus-visible{opacity:1}
+.rbtn:hover{color:var(--ink);background:var(--sunken)}
 .del:hover{color:var(--danger);background:var(--sunken)}
+/* touch devices have no hover, so a hover-only control is undiscoverable -- pin it visible */
+@media (hover:none){.rbtn{opacity:1}}
 
 .cell{width:100%;aspect-ratio:1;min-height:19px;border-radius:5px;
   background:var(--sunken);border:1px solid transparent;
@@ -222,8 +225,17 @@ input:focus-visible{outline:2px solid var(--primary);outline-offset:-1px;border-
 .toast{position:fixed;left:50%;bottom:24px;translate:-50% 0;z-index:var(--z-toast);
   background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:99px;
   font-size:.875rem;box-shadow:0 6px 24px oklch(0 0 0/.22);
+  display:inline-flex;align-items:center;gap:12px;max-width:calc(100vw - 28px);
   opacity:0;transition:opacity 200ms var(--ease),translate 200ms var(--ease)}
 .toast.on{opacity:1;translate:-50% -6px}
+/* Undo action lives on the toast -- the one floating surface the design already sanctions.
+   Colours are relative to currentColor so it reads in both the light and dark toast. */
+.toast .act{flex:none;appearance:none;font:inherit;font-weight:600;color:inherit;
+  background:transparent;border:1px solid color-mix(in oklch,currentColor 40%,transparent);
+  border-radius:99px;padding:3px 11px;cursor:pointer;
+  transition:background 140ms var(--ease)}
+.toast .act:hover{background:color-mix(in oklch,currentColor 16%,transparent)}
+.toast .act:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 
 @media (max-width:560px){
   .wrap{padding:18px 14px 80px}
@@ -250,6 +262,21 @@ input:focus-visible{outline:2px solid var(--primary);outline-offset:-1px;border-
   </div>
 
   <main id="app"></main>
+
+  <form class="add" id="add" hidden>
+    <input class="name" type="text" name="habit" maxlength="60" required
+           placeholder="Add a habit — e.g. Read 10 pages" aria-label="Habit name">
+    <input class="pts" type="number" name="points" min="0" max="99" step="1" value="1"
+           aria-label="Points per completion" title="Points per completion">
+    <button class="btn primary" type="submit" id="addsubmit">Add</button>
+    <button class="btn icon" type="button" id="editup" hidden aria-label="Move habit up" title="Move up">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+    <button class="btn icon" type="button" id="editdown" hidden aria-label="Move habit down" title="Move down">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></button>
+    <button class="btn" type="button" id="addcancel" hidden>Cancel</button>
+  </form>
 
   <details class="sync">
     <summary>Google Sheet sync — <span id="syncstate">not connected</span></summary>
@@ -313,30 +340,26 @@ input:focus-visible{outline:2px solid var(--primary);outline-offset:-1px;border-
         nothing, which catches everyone once.</p>
     </details>
   </details>
-
-  <form class="add" id="add" hidden>
-    <input class="name" type="text" name="habit" maxlength="60" required
-           placeholder="Add a habit — e.g. Read 10 pages" aria-label="Habit name">
-    <input class="pts" type="number" name="points" min="0" max="99" step="1" value="1"
-           aria-label="Points per completion" title="Points per completion">
-    <button class="btn primary" type="submit">Add</button>
-  </form>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="text/plain" id="gs-source">
 /**
- * Habits — Google Sheets sync endpoint.
+ * Habits & Review — Google Sheets sync endpoint.
  *
  * Paste this into an Apps Script project bound to your spreadsheet
  * (Extensions ▸ Apps Script), set SECRET below, then deploy it as a Web App.
  * Full instructions: SETUP.md in the project folder.
  *
- * The whole protocol is one call: the app POSTs its entire state, this script
- * merges it with what is already in the sheet, writes the result back, and
- * returns the merged state. The app adopts whatever comes back. One code path
- * for "first sync on a new device", "push my changes" and "pull theirs".
+ * The whole protocol is one call: an app POSTs its state, this script merges it
+ * with what is already in the sheet, writes the result back, and returns the
+ * merged state. The app adopts whatever comes back. One code path for "first
+ * sync on a new device", "push my changes" and "pull theirs".
+ *
+ * Two apps, one deployment: the Habits page sends { habits, ticks, ... } and the
+ * Review page sends { review, removedTopics }. Each request touches only the
+ * tabs for the keys it carries, so the two never clobber each other.
  */
 
 // Any string you like. It must match the secret you paste into the app.
@@ -401,9 +424,12 @@ function asDate(v) {
   return String(v).trim();
 }
 
+var REVIEW_COLS = ['id', 'topic', 'notes', 'created', 'interval', 'nextDue', 'reviews'];
+
 function readState(ss) {
   var hRows = tab(ss, 'habits', ['id', 'name', 'points']).getDataRange().getValues();
   var tRows = tab(ss, 'ticks', ['habit_id', 'date']).getDataRange().getValues();
+  var rRows = tab(ss, 'review', REVIEW_COLS).getDataRange().getValues();
 
   var habits = [];
   for (var i = 1; i < hRows.length; i++) {
@@ -421,7 +447,25 @@ function readState(ss) {
     ticks[String(tRows[j][0]).trim() + '|' + asDate(tRows[j][1])] = 1;
   }
 
-  return { habits: habits, ticks: ticks };
+  // The reviews[] history is a JSON blob in its own column -- a flat sheet can't
+  // hold the nested array, and keeping it as text sidesteps date reinterpretation.
+  var review = [];
+  for (var m = 1; m < rRows.length; m++) {
+    if (!rRows[m][0]) continue;
+    var reviews = [];
+    try { reviews = JSON.parse(rRows[m][6] || '[]'); } catch (e) { reviews = []; }
+    review.push({
+      id: String(rRows[m][0]).trim(),
+      topic: String(rRows[m][1]),
+      notes: String(rRows[m][2]),
+      created: asDate(rRows[m][3]),
+      interval: Number(rRows[m][4]) || 1,
+      nextDue: asDate(rRows[m][5]),
+      reviews: reviews
+    });
+  }
+
+  return { habits: habits, ticks: ticks, review: review };
 }
 
 function writeState(ss, state) {
@@ -446,6 +490,19 @@ function writeState(ss, state) {
   range.setValues(tRows);
   t.getRange(1, 1, 1, 2).setFontWeight('bold');
   t.setFrozenRows(1);
+
+  var rv = tab(ss, 'review', REVIEW_COLS);
+  rv.clear();
+  var rRows = [REVIEW_COLS.slice()];
+  (state.review || []).forEach(function (x) {
+    rRows.push([x.id, x.topic, x.notes || '', x.created || '', x.interval || 1,
+                x.nextDue || '', JSON.stringify(x.reviews || [])]);
+  });
+  var rRange = rv.getRange(1, 1, rRows.length, REVIEW_COLS.length);
+  rRange.setNumberFormat('@');           // text — dates and the JSON blob must survive verbatim
+  rRange.setValues(rRows);
+  rv.getRange(1, 1, 1, REVIEW_COLS.length).setFontWeight('bold');
+  rv.setFrozenRows(1);
 
   tab(ss, 'meta', ['key', 'value']).getRange(1, 1, 2, 2).setValues([
     ['key', 'value'],
@@ -483,7 +540,44 @@ function mergeState(current, incoming) {
     if (gone[key.slice(0, key.indexOf('|'))]) delete ticks[key];
   });
 
-  return { habits: habits, ticks: ticks };
+  return { habits: habits, ticks: ticks, review: mergeReview(current.review || [], incoming) };
+}
+
+/**
+ * Review topics merge by UNION on id, the same spirit as ticks. A Habits-only
+ * sync omits the review keys entirely, so the tab is preserved untouched; a
+ * Review sync carries { review, removedTopics }.
+ *
+ * For a topic present on both sides the richer record wins: more entries in
+ * reviews[] means a later point in the schedule, so its interval/nextDue are the
+ * ones to keep. Deletions travel named in removedTopics — an empty review list
+ * means "new device", never "wipe the tab", mirroring the habits rule.
+ *
+ * The Review page adopts the server's result directly, so this rule lives only
+ * here and in the copy embedded in index.html; keep the two identical.
+ */
+function mergeReview(current, incoming) {
+  if (!incoming.review && !incoming.removedTopics) return current;   // not part of this request
+
+  var merged = {};
+  current.forEach(function (t) { merged[t.id] = t; });
+  (incoming.review || []).forEach(function (t) {
+    var cur = merged[t.id];
+    merged[t.id] = cur ? pickTopic(cur, t) : t;
+  });
+
+  var gone = {};
+  (incoming.removedTopics || []).forEach(function (id) { gone[id] = 1; });
+
+  var out = [];
+  Object.keys(merged).forEach(function (id) { if (!gone[id]) out.push(merged[id]); });
+  return out;
+}
+
+function pickTopic(a, b) {
+  var ar = (a.reviews || []).length, br = (b.reviews || []).length;
+  if (br !== ar) return br > ar ? b : a;
+  return String(b.nextDue) >= String(a.nextDue) ? b : a;   // tie -> the later schedule
 }
 </script>
 
@@ -679,12 +773,38 @@ function save(){
 }
 
 var toastTimer;
-function toast(msg){
+// Second arg is an optional {label, fn} action -- rendered as an Undo button on the
+// toast. textContent/appendChild keep habit names safe from HTML injection.
+function toast(msg, action){
   var t = document.getElementById('toast');
-  t.textContent = msg;
+  t.textContent = '';
+  t.appendChild(document.createTextNode(msg));
+  if (action && action.label && typeof action.fn === 'function'){
+    var b = el('button', 'act', action.label);
+    b.type = 'button';
+    b.addEventListener('click', function(){
+      clearTimeout(toastTimer);
+      t.classList.remove('on');
+      action.fn();
+    });
+    t.appendChild(b);
+  }
   t.classList.add('on');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(function(){ t.classList.remove('on'); }, 2600);
+  // give an actionable toast longer to be clicked than a plain notice
+  toastTimer = setTimeout(function(){ t.classList.remove('on'); }, action ? 6000 : 2600);
+}
+
+/* ---------- undo -------------------------------------------------------
+   One level of undo for the reversible-but-silent actions (un-tick, delete,
+   import). Snapshot the whole document before the change; restore adopts the
+   snapshot and re-syncs, so the undo propagates like any other edit. */
+function snapshot(){ return JSON.parse(JSON.stringify(state)); }
+function restore(snap){
+  state = snap;
+  state.removedTicks = state.removedTicks || [];
+  state.removedHabits = state.removedHabits || [];
+  save(); render(); queueSync();
 }
 
 /* ---------- render ----------------------------------------------------- */
@@ -696,6 +816,7 @@ function el(tag, cls, txt){
 }
 var CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5l5 5 10-11"/></svg>';
 var CROSS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>';
+var PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17z"/><path d="M13.5 6.5l3 3"/></svg>';
 
 function render(){
   var todayIso = iso(new Date());
@@ -800,7 +921,13 @@ function render(){
     var row = el('div', 'hrow');
     row.appendChild(el('span', 'nm', h.name));
     row.appendChild(el('span', 'n', h.count + '/' + s.days));
-    var del = el('button', 'del');
+    var edit = el('button', 'rbtn');
+    edit.type = 'button';
+    edit.dataset.edit = h.id;
+    edit.setAttribute('aria-label', 'Edit habit: ' + h.name);
+    edit.innerHTML = PENCIL;
+    row.appendChild(edit);
+    var del = el('button', 'rbtn del');
     del.type = 'button';
     del.dataset.del = h.id;
     del.setAttribute('aria-label', 'Delete habit: ' + h.name);
@@ -872,31 +999,44 @@ function render(){
 
 /* ---------- events ----------------------------------------------------- */
 function toggle(k){
+  // a day that hasn't happened yet can't be recorded -- the future grid cells
+  // render as dashed absence but were still clickable
+  var date = k.slice(k.indexOf('|') + 1);
+  if (dayNum(date) > dayNum(iso(new Date()))) return;
+
   if (state.ticks[k]){
+    var snap = snapshot();               // un-ticking removes data -- make it undoable
     delete state.ticks[k];
     if (state.removedTicks.indexOf(k) < 0) state.removedTicks.push(k);
+    save();
+    render();
+    queueSync();
+    toast('Unticked', {label: 'Undo', fn: function(){ restore(snap); }});
   } else {
     state.ticks[k] = 1;
     state.removedTicks = state.removedTicks.filter(function(x){ return x !== k; });
+    save();
+    render();
+    queueSync();
   }
-  save();
-  render();
-  queueSync();
 }
 
 app.addEventListener('click', function(e){
-  var t = e.target.closest('[data-del],[data-k],#prev,#next,#export,#import');
+  var t = e.target.closest('[data-del],[data-edit],[data-k],#prev,#next,#export,#import');
   if (!t) return;
   if (t.dataset.del){
     var h = state.habits.find(function(x){ return x.id === t.dataset.del; });
     if (!confirm('Delete "' + h.name + '" and every tick recorded against it?')) return;
+    if (editingId === h.id) cancelEdit();
+    var snap = snapshot();
     var pre = h.id + '|';
     state.habits = state.habits.filter(function(x){ return x.id !== h.id; });
     for (var k in state.ticks) if (k.slice(0, pre.length) === pre) delete state.ticks[k];
     state.removedHabits.push(h.id);
     save(); render(); queueSync();
-    toast('Deleted "' + h.name + '"');
+    toast('Deleted "' + h.name + '"', {label: 'Undo', fn: function(){ restore(snap); }});
   }
+  else if (t.dataset.edit) startEdit(t.dataset.edit);
   else if (t.id === 'prev'){ ym = shiftMonth(ym, -1); render(); }
   else if (t.id === 'next'){ ym = shiftMonth(ym, 1); render(); }
   else if (t.id === 'export') exportBackup();
@@ -909,19 +1049,72 @@ app.addEventListener('change', function(e){
   if (e.target.dataset.k) toggle(e.target.dataset.k);
 });
 
-document.getElementById('add').addEventListener('submit', function(e){
+/* The add form doubles as the edit form: editingId null means "add a new habit",
+   otherwise the same fields write back to that habit. Reusing it keeps one set of
+   inputs and one submit path rather than a second component. */
+var editingId = null;
+var addForm = document.getElementById('add');
+
+function startEdit(id){
+  var h = state.habits.find(function(x){ return x.id === id; });
+  if (!h) return;
+  editingId = id;
+  var f = addForm.elements;
+  f.habit.value = h.name;
+  f.points.value = h.points;
+  document.getElementById('addsubmit').textContent = 'Save';
+  document.getElementById('addcancel').hidden = false;
+  document.getElementById('editup').hidden = false;
+  document.getElementById('editdown').hidden = false;
+  addForm.scrollIntoView({block: 'nearest'});
+  f.habit.focus();
+  f.habit.select();
+}
+
+function cancelEdit(){
+  editingId = null;
+  var f = addForm.elements;
+  f.habit.value = '';
+  f.points.value = 1;
+  document.getElementById('addsubmit').textContent = 'Add';
+  document.getElementById('addcancel').hidden = true;
+  document.getElementById('editup').hidden = true;
+  document.getElementById('editdown').hidden = true;
+}
+
+// Order is a local view concern -- the sheet merge unions by id and doesn't carry
+// order, so a reorder stays on this device. Reachable by keyboard, per the daily-path rule.
+function moveHabit(dir){
+  if (!editingId) return;
+  var i = state.habits.findIndex(function(x){ return x.id === editingId; });
+  var j = i + dir;
+  if (i < 0 || j < 0 || j >= state.habits.length) return;
+  var tmp = state.habits[i];
+  state.habits[i] = state.habits[j];
+  state.habits[j] = tmp;
+  save(); render();
+}
+
+document.getElementById('editup').addEventListener('click', function(){ moveHabit(-1); });
+document.getElementById('editdown').addEventListener('click', function(){ moveHabit(1); });
+document.getElementById('addcancel').addEventListener('click', cancelEdit);
+
+addForm.addEventListener('submit', function(e){
   e.preventDefault();
   var f = this.elements;
   var name = f.habit.value.trim();
   if (!name) return;
-  state.habits.push({
-    id: 'h' + Date.now().toString(36),
-    name: name,
-    points: Math.max(0, Math.min(99, Math.round(+f.points.value) || 0))
-  });
-  f.habit.value = '';
-  f.points.value = 1;
-  f.habit.focus();
+  var points = Math.max(0, Math.min(99, Math.round(+f.points.value) || 0));
+  if (editingId){
+    var h = state.habits.find(function(x){ return x.id === editingId; });
+    if (h){ h.name = name; h.points = points; }
+    cancelEdit();
+  } else {
+    state.habits.push({ id: 'h' + Date.now().toString(36), name: name, points: points });
+    f.habit.value = '';
+    f.points.value = 1;
+    f.habit.focus();
+  }
   save(); render(); queueSync();
 });
 
@@ -953,11 +1146,13 @@ file.addEventListener('change', function(){
       if (!s || !Array.isArray(s.habits) || !s.ticks) throw new Error('not a Habits backup');
       if (!confirm('Replace ' + plural(state.habits.length, 'habit', 'habits') +
                    ' with ' + plural(s.habits.length, 'habit', 'habits') + ' from this file?')) return;
+      var snap = snapshot();
+      if (editingId) cancelEdit();
       state = s;
       state.removedTicks = state.removedTicks || [];
       state.removedHabits = state.removedHabits || [];
       save(); render(); queueSync();
-      toast('Backup restored');
+      toast('Backup restored', {label: 'Undo', fn: function(){ restore(snap); }});
     } catch (err){ toast('Import failed — ' + err.message); }
   };
   r.readAsText(f);

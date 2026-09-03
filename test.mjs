@@ -145,6 +145,49 @@ assert.ok(wedge(50, 50, 46, 1).includes('49.99'), 'and it closes just short of i
   assert.deepEqual(Object.keys(deleted.ticks), [], 'and takes its ticks with it');
 }
 
+// review sync merge: the backend now also carries the Review page's topics. Pull
+// the real merge functions out of sheet-sync.gs (the copy embedded in index.html
+// is byte-checked against it above) and exercise the review-specific rules.
+{
+  const gs = readFileSync(new URL('./sheet-sync.gs', import.meta.url), 'utf8');
+  const { mergeState: srvMerge, mergeReview, pickTopic } =
+    new Function(gs + '\nreturn {mergeState, mergeReview, pickTopic};')();
+
+  const topic = (id, n, extra) => ({ id, topic: 'T' + id, notes: '', created: '2026-09-01',
+    interval: 8, nextDue: '2026-09-09', reviews: new Array(n).fill(0).map((_, i) => ({date:'2026-09-0'+(i+1), rating:'easy'})), ...extra });
+
+  // a Habits-only sync leaves the review tab untouched
+  const cur = { habits: [{id:'a',name:'R',points:1}], ticks: {}, review: [topic('r1', 2)] };
+  const afterHabits = srvMerge(cur, { habits: [{id:'a',name:'R',points:1}], ticks: {'a|2026-09-01':1} });
+  assert.equal(afterHabits.review.length, 1, 'a Habits sync preserves review topics');
+  assert.equal(afterHabits.review[0].id, 'r1');
+
+  // a Review-only sync leaves habits/ticks untouched
+  const afterReview = srvMerge(cur, { review: [topic('r1', 2), topic('r2', 0)], removedTopics: [] });
+  assert.deepEqual(afterReview.habits, cur.habits, 'a Review sync preserves habits');
+  assert.equal(afterReview.review.length, 2, 'a new topic unions in');
+
+  // shared topic: the record with the longer reviews[] history wins (its schedule is newer)
+  const merged = mergeReview([topic('r1', 3, {nextDue:'2026-10-01', interval:20})],
+                             { review: [topic('r1', 1, {nextDue:'2026-09-05', interval:3})] });
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].reviews.length, 3, 'the device further along the schedule wins');
+  assert.equal(merged[0].interval, 20);
+
+  // tie on review count -> the later nextDue wins
+  assert.equal(pickTopic(topic('x', 2, {nextDue:'2026-09-01'}), topic('x', 2, {nextDue:'2026-09-20'})).nextDue,
+    '2026-09-20', 'a tie is broken by the later schedule');
+
+  // a deletion travels as a tombstone and wins over the union
+  const afterDel = mergeReview([topic('r1', 2), topic('r2', 1)],
+                               { review: [topic('r1', 2)], removedTopics: ['r2'] });
+  assert.deepEqual(afterDel.map(t => t.id), ['r1'], 'a tombstoned topic is removed');
+
+  // an empty review list with no tombstones is a new device, not a wipe
+  const fresh = mergeReview([topic('r1', 2)], { review: [], removedTopics: [] });
+  assert.deepEqual(fresh.map(t => t.id), ['r1'], 'an empty review sync adopts the sheet, never wipes it');
+}
+
 // browsing another month changes the grid but not "today" or the live run
 const past = summarize(state, '2026-08', '2026-09-03');
 assert.equal(past.days, 31);

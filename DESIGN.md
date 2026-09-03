@@ -44,6 +44,7 @@ typography:
     fontWeight: 400
     lineHeight: 1.4
 rounded:
+  focus: "4px"
   cell: "5px"
   control: "6px"
   box: "7px"
@@ -241,6 +242,15 @@ it, use a tonal step instead.
 
 Every interactive element is a rectangle with a 5–10px radius, a 1px border, and a
 140–220ms transition on colour only. Nothing scales, lifts, or bounces on hover.
+
+### Rating buttons (Review)
+Three outcomes after a recall attempt — Blanked, Struggled, Easy.
+- **Weight:** identical. Same border, same background, same size. None is styled as
+  success or failure; the Neutral Gap Rule applies to recall as much as to a missed day.
+- **Shape:** equal-width, `flex: 1`, minimum 44px tall — the daily path.
+- **Secondary line:** each button states the consequence in days (`push it out · 8 days`),
+  so the schedule is visible before committing rather than discovered after.
+- **Colour:** none. Indigo would imply one answer is the right one.
 
 ### Buttons
 - **Shape:** gently rounded (10px), 38px tall, 1px border always present.

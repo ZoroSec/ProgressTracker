@@ -6,8 +6,8 @@ import { readFileSync } from 'node:fs';
 
 const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
 const pure = html.split('<script>')[1].split('/* ---------- state')[0];
-const { summarize, bestStreak, currentStreak, monthDays, shiftMonth, key, wedge, pct } =
-  new Function(pure + '\nreturn {summarize, bestStreak, currentStreak, monthDays, shiftMonth, key, wedge, pct};')();
+const { summarize, bestStreak, currentStreak, monthDays, shiftMonth, key, wedge, pct, mergeState, b64url, unb64url } =
+  new Function(pure + '\nreturn {summarize, bestStreak, currentStreak, monthDays, shiftMonth, key, wedge, pct, mergeState, b64url, unb64url};')();
 
 // calendar
 assert.equal(monthDays('2026-02'), 28);
@@ -96,6 +96,55 @@ assert.ok(!wedge(50, 50, 46, 1).includes('L 50 50'),
   'a full circle is an arc, not a wedge from the centre');
 assert.ok(wedge(50, 50, 46, 1).includes('49.99'), 'and it closes just short of its start');
 
+// the script offered in the page must BE the script in the repo -- the copy button
+// hands it to a user who will never see sheet-sync.gs, so drift would ship silently
+{
+  const embedded = html.split('<script type="text/plain" id="gs-source">')[1].split('</'+'script>')[0];
+  const onDisk = readFileSync(new URL('./sheet-sync.gs', import.meta.url), 'utf8');
+  const norm = x => x.split('\r\n').join('\n').trim();   // CRLF is not drift
+  assert.equal(norm(embedded), norm(onDisk), 'embedded Apps Script is out of date');
+  assert.ok(onDisk.includes("var SECRET = 'CHANGE_ME';"),
+    'the placeholder the copy button substitutes must still exist verbatim');
+}
+
+// device link: the payload that carries URL + secret to a second device
+{
+  const trip = o => JSON.parse(unb64url(b64url(JSON.stringify(o))));
+  const cfg = {u: 'https://script.google.com/macros/s/AKfycbx_-9/exec', s: 'saffron-flint-amber-5558'};
+  assert.deepEqual(trip(cfg), cfg, 'round-trips a real deployment URL');
+
+  assert.deepEqual(trip({u: 'https://x/exec', s: 'pässwörd-éè-中文'}), 
+    {u: 'https://x/exec', s: 'pässwörd-éè-中文'}, 'survives non-ASCII secrets');
+
+  const enc = b64url(JSON.stringify(cfg));
+  assert.ok(!/[+/=]/.test(enc), 'URL-safe: no +, / or = to be mangled in a fragment');
+  assert.ok(/^[#&]?s?=?/.test('#s=' + enc) && ('#s=' + enc).match(/[#&]s=([^&]+)/)[1] === enc,
+    'the fragment the app parses reproduces the payload exactly');
+}
+
+// sync merge: the rule the Apps Script mirrors
+{
+  const local  = {habits: [{id:'a',name:'Read',points:2}], ticks: {'a|2026-09-01':1},
+                  removedTicks: [], removedHabits: []};
+  const remote = {habits: [{id:'a',name:'Read',points:2}], ticks: {'a|2026-09-02':1}};
+
+  const u = mergeState(local, remote);
+  assert.deepEqual(Object.keys(u.ticks).sort(), ['a|2026-09-01', 'a|2026-09-02'],
+    'offline additions on both sides survive');
+
+  const unticked = mergeState({...local, ticks: {}, removedTicks: ['a|2026-09-02']}, remote);
+  assert.deepEqual(Object.keys(unticked.ticks), [],
+    'a deliberate un-tick beats the union and is not resurrected');
+
+  const fresh = mergeState({habits: [], ticks: {}, removedTicks: [], removedHabits: []}, remote);
+  assert.equal(fresh.habits.length, 1,
+    'a new device with nothing local adopts the sheet, it does not wipe it');
+
+  const deleted = mergeState({...local, removedHabits: ['a']}, remote);
+  assert.deepEqual(deleted.habits, [], 'a named habit deletion propagates');
+  assert.deepEqual(Object.keys(deleted.ticks), [], 'and takes its ticks with it');
+}
+
 // browsing another month changes the grid but not "today" or the live run
 const past = summarize(state, '2026-08', '2026-09-03');
 assert.equal(past.days, 31);
@@ -112,4 +161,4 @@ assert.equal(zero.streak, 0);
 assert.deepEqual(zero.dayPct.slice(0, 3), [0, 0, 0], 'no habits: no division by zero');
 assert.equal(zero.weeks[0].pct, 0);
 
-console.log('ok — calendar, streaks, per-day/weekly/monthly progress, empty state');
+console.log('ok — calendar, streaks, progress, sync merge, empty state');

@@ -82,7 +82,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .btn.primary:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
 .btn.icon{min-width:38px;padding:0 9px}
 
-input[type=text],input[type=number]{
+input[type=text],input[type=number],input[type=url],input[type=password]{
   min-height:38px;padding:0 12px;border:1px solid var(--line-strong);
   border-radius:var(--radius);background:var(--bg);color:var(--ink);font:inherit;font-size:.9375rem;
   transition:border-color 160ms var(--ease)}
@@ -95,6 +95,8 @@ input:focus-visible{outline:2px solid var(--primary);outline-offset:-1px;border-
   padding-bottom:20px;margin-bottom:24px;border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:baseline;gap:10px}
 .brand .sub{color:var(--muted);font-size:.8125rem}
+.brand a{color:var(--muted);font-size:.8125rem;text-decoration:none}
+.brand a:hover{color:var(--ink);text-decoration:underline}
 
 /* ---- today ---- */
 .today{margin-bottom:36px}
@@ -190,6 +192,33 @@ input:focus-visible{outline:2px solid var(--primary);outline-offset:-1px;border-
   padding:28px 22px;text-align:center;color:var(--muted);max-width:52ch;margin:0 auto}
 .empty h2{color:var(--ink);margin-bottom:8px;font-size:1.0625rem}
 
+.sync{margin-top:28px;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--surface);font-size:.875rem}
+.sync summary{padding:12px 16px;cursor:pointer;color:var(--muted);border-radius:var(--radius)}
+.sync summary:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.sync #syncstate{color:var(--ink)}
+.sync #syncstate.bad{color:var(--danger)}
+.sync form{padding:0 16px 16px;display:flex;flex-direction:column;gap:12px}
+.sync label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:.8125rem}
+.sync input{width:100%}
+.syncbtns{display:flex;gap:10px;flex-wrap:wrap}
+.synchelp{color:var(--muted);font-size:.75rem;max-width:60ch}
+.howto{border-top:1px solid var(--line);margin:0 16px 12px;padding-top:12px}
+.howto summary{padding:4px 0;cursor:pointer;color:var(--muted);font-size:.8125rem}
+.howto .mins{color:var(--line-strong)}
+.howto ol{margin:10px 0 0;padding-left:22px;font-size:.8125rem;line-height:1.65;max-width:64ch}
+.howto li{margin-bottom:10px}
+.howto code{font-size:.75rem;background:var(--sunken);padding:1px 5px;border-radius:4px}
+.howto a{color:var(--primary)}
+.howto .syncbtns{margin:8px 0 4px}
+.reveal{display:flex;gap:8px;align-items:center}
+.reveal input{flex:1;min-width:0}
+.reveal button{flex:none;font-size:.75rem;color:var(--muted);padding:6px 8px;border-radius:6px}
+.reveal button:hover{color:var(--ink);background:var(--sunken)}
+#gsfallback{width:100%;margin-top:8px;font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-size:.6875rem;background:var(--bg);color:var(--ink);border:1px solid var(--line-strong);
+  border-radius:var(--radius);padding:8px}
+
 .toast{position:fixed;left:50%;bottom:24px;translate:-50% 0;z-index:var(--z-toast);
   background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:99px;
   font-size:.875rem;box-shadow:0 6px 24px oklch(0 0 0/.22);
@@ -211,6 +240,7 @@ input:focus-visible{outline:2px solid var(--primary);outline-offset:-1px;border-
   <div class="top">
     <div class="brand">
       <h1>Habits</h1>
+      <a href="review.html">Review &rarr;</a>
       <span class="sub" id="stored"></span>
     </div>
     <button class="btn icon" id="theme" aria-label="Switch to dark theme" title="Switch theme">
@@ -220,6 +250,69 @@ input:focus-visible{outline:2px solid var(--primary);outline-offset:-1px;border-
   </div>
 
   <main id="app"></main>
+
+  <details class="sync">
+    <summary>Google Sheet sync — <span id="syncstate">not connected</span></summary>
+    <form id="syncform" onsubmit="return false">
+      <label>Web app URL
+        <input type="url" name="url" placeholder="https://script.google.com/macros/s/…/exec"
+               autocomplete="off" spellcheck="false"></label>
+      <label>Shared secret
+        <span class="reveal">
+          <input type="password" name="secret" autocomplete="off" spellcheck="false">
+          <button type="button" id="syncshow" aria-label="Show secret">Show</button>
+        </span></label>
+      <div class="syncbtns">
+        <button class="btn primary" type="button" id="syncsave">Save &amp; sync</button>
+        <button class="btn" type="button" id="syncnow">Sync now</button>
+        <button class="btn" type="button" id="synclink" disabled>Copy device link</button>
+        <button class="btn" type="button" id="synctest" disabled>Test URL in a tab</button>
+      </div>
+      <p class="synchelp">Stored on this device only, never sent anywhere except your
+        own sheet. Paste the same URL and secret on every device you use.</p>
+    </form>
+
+    <details class="howto">
+      <summary>First time? Create the sheet <span class="mins">about 10 minutes</span></summary>
+      <ol>
+        <li>Open <a href="https://sheets.new" target="_blank" rel="noopener">sheets.new</a>.
+          Name it anything. Leave it empty — the tabs create themselves.</li>
+        <li>In that sheet: <b>Extensions ▸ Apps Script</b>. Delete the <code>myFunction</code>
+          stub already in the editor.</li>
+        <li>Press <b>Generate</b> for a secret, then <b>Copy script</b> below and paste it into
+          the editor. Save.
+          <div class="syncbtns">
+            <button class="btn" type="button" id="gengen">Generate secret</button>
+            <button class="btn" type="button" id="gscopy">Copy script</button>
+          </div>
+          <p class="synchelp" id="gsnote">The copied script already contains your secret —
+            no editing needed.</p>
+          <textarea id="gsfallback" readonly hidden rows="6"
+            aria-label="Apps Script source — select all and copy"></textarea>
+        </li>
+        <li><b>Deploy ▸ New deployment</b>. Gear icon ▸ <b>Web app</b>. Set
+          <b>Execute as: Me</b> and <b>Who has access: Anyone</b>, then <b>Deploy</b>.</li>
+        <li>Google warns <i>“Google hasn’t verified this app”</i> — expected, you wrote it.
+          <b>Advanced ▸ Go to … (unsafe) ▸ Allow</b>.</li>
+        <li>Copy the <b>Web app URL</b> (ends in <code>/exec</code>) into the box above and
+          press <b>Save &amp; sync</b>.</li>
+      </ol>
+      <p class="synchelp"><b>Other devices:</b> steps 1–5 are done once. Don't retype anything —
+        press <b>Copy device link</b> above and open that link on the other device. It configures
+        itself and syncs. The link carries the secret, so send it the way you'd send a password,
+        and delete the message afterwards.</p>
+      <p class="synchelp"><b>Setting someone else up with their own log?</b> Send them a copy of
+        your sheet with the script already inside: take your spreadsheet's address and replace
+        the trailing <code>/edit</code> with <code>/copy</code>. One click gives them their own
+        sheet and script, so they skip steps 1–3 and only deploy. They must generate their own
+        secret and redeploy — a copied deployment is not theirs.</p>
+      <p class="synchelp"><b>Anyone holding both the URL and the secret can read and edit this
+        data</b>, so treat the pair as a password. The script can reach nothing else in your
+        Google account. If you edit the script later, redeploy it —
+        <b>Deploy ▸ Manage deployments ▸ pencil ▸ Version: New version</b>. Saving alone changes
+        nothing, which catches everyone once.</p>
+    </details>
+  </details>
 
   <form class="add" id="add" hidden>
     <input class="name" type="text" name="habit" maxlength="60" required
@@ -231,6 +324,168 @@ input:focus-visible{outline:2px solid var(--primary);outline-offset:-1px;border-
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="text/plain" id="gs-source">
+/**
+ * Habits — Google Sheets sync endpoint.
+ *
+ * Paste this into an Apps Script project bound to your spreadsheet
+ * (Extensions ▸ Apps Script), set SECRET below, then deploy it as a Web App.
+ * Full instructions: SETUP.md in the project folder.
+ *
+ * The whole protocol is one call: the app POSTs its entire state, this script
+ * merges it with what is already in the sheet, writes the result back, and
+ * returns the merged state. The app adopts whatever comes back. One code path
+ * for "first sync on a new device", "push my changes" and "pull theirs".
+ */
+
+// Any string you like. It must match the secret you paste into the app.
+// This is what stops a stranger who guesses the URL from writing to your sheet.
+var SECRET = 'CHANGE_ME';
+
+function doGet(e)  { return handle(e); }
+function doPost(e) { return handle(e); }
+
+function handle(e) {
+  try {
+    if (!e || !e.parameter || e.parameter.secret !== SECRET) {
+      return json({ error: 'bad or missing secret' });
+    }
+
+    var incoming = null;
+    if (e.postData && e.postData.contents) incoming = JSON.parse(e.postData.contents);
+
+    // Two devices syncing at once would otherwise interleave read and write.
+    var lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      var ss = SpreadsheetApp.getActive();
+      var state = readState(ss);
+      if (incoming) {
+        state = mergeState(state, incoming);
+        writeState(ss, state);
+      }
+      return json(state);
+    } finally {
+      lock.releaseLock();
+    }
+  } catch (err) {
+    return json({ error: String(err && err.message || err) });
+  }
+}
+
+function json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/* ---------------------------------------------------------------- storage */
+
+function tab(ss, name, headers) {
+  var sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+// Dates are stored as TEXT. If Sheets parses "2026-09-01" into a real date, the
+// spreadsheet's timezone can shift it a day either way on the round trip, which
+// silently moves ticks. Keeping the column as text sidesteps that entirely.
+function asDate(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, SpreadsheetApp.getActive().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(v).trim();
+}
+
+function readState(ss) {
+  var hRows = tab(ss, 'habits', ['id', 'name', 'points']).getDataRange().getValues();
+  var tRows = tab(ss, 'ticks', ['habit_id', 'date']).getDataRange().getValues();
+
+  var habits = [];
+  for (var i = 1; i < hRows.length; i++) {
+    if (!hRows[i][0]) continue;
+    habits.push({
+      id: String(hRows[i][0]).trim(),
+      name: String(hRows[i][1]),
+      points: Number(hRows[i][2]) || 0
+    });
+  }
+
+  var ticks = {};
+  for (var j = 1; j < tRows.length; j++) {
+    if (!tRows[j][0] || !tRows[j][1]) continue;
+    ticks[String(tRows[j][0]).trim() + '|' + asDate(tRows[j][1])] = 1;
+  }
+
+  return { habits: habits, ticks: ticks };
+}
+
+function writeState(ss, state) {
+  var h = tab(ss, 'habits', ['id', 'name', 'points']);
+  h.clear();
+  var hRows = [['id', 'name', 'points']];
+  state.habits.forEach(function (x) { hRows.push([x.id, x.name, x.points]); });
+  h.getRange(1, 1, hRows.length, 3).setValues(hRows);
+  h.getRange(1, 1, 1, 3).setFontWeight('bold');
+  h.setFrozenRows(1);
+
+  var t = tab(ss, 'ticks', ['habit_id', 'date']);
+  t.clear();
+  var keys = Object.keys(state.ticks).sort();
+  var tRows = [['habit_id', 'date']];
+  keys.forEach(function (k) {
+    var i = k.indexOf('|');
+    tRows.push([k.slice(0, i), k.slice(i + 1)]);
+  });
+  var range = t.getRange(1, 1, tRows.length, 2);
+  range.setNumberFormat('@');           // plain text — see asDate() above
+  range.setValues(tRows);
+  t.getRange(1, 1, 1, 2).setFontWeight('bold');
+  t.setFrozenRows(1);
+
+  tab(ss, 'meta', ['key', 'value']).getRange(1, 1, 2, 2).setValues([
+    ['key', 'value'],
+    ['updated', Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd HH:mm:ss')]
+  ]);
+}
+
+/* ------------------------------------------------------------------ merge */
+
+/**
+ * Ticks merge by UNION, which is the right default: two devices that were both
+ * offline almost always have additions to contribute, and a union loses nothing.
+ * The exception is an un-tick — deleting a key can't be told apart from never
+ * having had it — so the app sends the keys it deliberately removed since its
+ * last successful sync, and those win over the union.
+ *
+ * This mirrors mergeState() in index.html. Two runtimes, so two copies; if you
+ * change the rule, change it in both.
+ */
+function mergeState(current, incoming) {
+  var ticks = {}, k;
+  for (k in current.ticks) ticks[k] = 1;
+  for (k in (incoming.ticks || {})) ticks[k] = 1;
+
+  (incoming.removed || []).forEach(function (key) { delete ticks[key]; });
+
+  // An empty incoming habit list means "new device, nothing local yet" — never
+  // a request to wipe the sheet. Real deletions arrive named, in removedHabits.
+  var habits = (incoming.habits && incoming.habits.length) ? incoming.habits : current.habits;
+
+  var gone = {};
+  (incoming.removedHabits || []).forEach(function (id) { gone[id] = 1; });
+  habits = habits.filter(function (h) { return !gone[h.id]; });
+  Object.keys(ticks).forEach(function (key) {
+    if (gone[key.slice(0, key.indexOf('|'))]) delete ticks[key];
+  });
+
+  return { habits: habits, ticks: ticks };
+}
+</script>
 
 <script>
 var KEY = 'habits.v1', THEME_KEY = 'habits.theme', DAY = 86400000;
@@ -340,6 +595,41 @@ function summarize(state, ym, today){
 
 function plural(n, one, many){ return n + ' ' + (n === 1 ? one : many); }
 
+// Typing a long secret on a phone keyboard is the worst part of adding a device,
+// so hand over both fields as one link. The payload rides in the URL *fragment*,
+// which browsers never send to a server -- it stays out of every access log.
+function b64url(str){
+  return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function unb64url(str){
+  var t = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (t.length % 4) t += '=';
+  return decodeURIComponent(escape(atob(t)));
+}
+
+// Merge a remote document into a local one. Ticks union -- two devices that were
+// both offline almost always have additions to contribute, and a union loses
+// nothing. An un-tick is the exception: a missing key can't be told apart from
+// one that was never there, so deliberate removals are carried explicitly and
+// win over the union. Mirrored by mergeState() in sheet-sync.gs; change both.
+function mergeState(local, remote){
+  var ticks = {}, k;
+  for (k in remote.ticks) ticks[k] = 1;
+  for (k in local.ticks) ticks[k] = 1;
+  (local.removedTicks || []).forEach(function(key){ delete ticks[key]; });
+
+  // An empty local habit list means "nothing here yet", never "wipe the sheet".
+  var habits = local.habits && local.habits.length ? local.habits : (remote.habits || []);
+  var gone = {};
+  (local.removedHabits || []).forEach(function(id){ gone[id] = 1; });
+  habits = habits.filter(function(h){ return !gone[h.id]; });
+  Object.keys(ticks).forEach(function(key){
+    if (gone[key.slice(0, key.indexOf('|'))]) delete ticks[key];
+  });
+
+  return {habits: habits, ticks: ticks};
+}
+
 // One decimal, but never a trailing ".0" -- "100%" not "100.0%".
 function pct(n){ return (Math.round(n * 10) / 10).toFixed(1).replace(/\.0$/, '') + '%'; }
 
@@ -364,9 +654,14 @@ function wedge(cx, cy, r, frac){
 function load(){
   try {
     var s = JSON.parse(localStorage.getItem(KEY));
-    if (s && Array.isArray(s.habits) && s.ticks) return s;
+    if (s && Array.isArray(s.habits) && s.ticks){
+      // tombstones survive a reload, so an un-tick made offline still sticks
+      s.removedTicks = s.removedTicks || [];
+      s.removedHabits = s.removedHabits || [];
+      return s;
+    }
   } catch (e) {}
-  return {habits: [], ticks: {}};
+  return {habits: [], ticks: {}, removedTicks: [], removedHabits: []};
 }
 
 var state = load();
@@ -577,10 +872,16 @@ function render(){
 
 /* ---------- events ----------------------------------------------------- */
 function toggle(k){
-  if (state.ticks[k]) delete state.ticks[k];
-  else state.ticks[k] = 1;
+  if (state.ticks[k]){
+    delete state.ticks[k];
+    if (state.removedTicks.indexOf(k) < 0) state.removedTicks.push(k);
+  } else {
+    state.ticks[k] = 1;
+    state.removedTicks = state.removedTicks.filter(function(x){ return x !== k; });
+  }
   save();
   render();
+  queueSync();
 }
 
 app.addEventListener('click', function(e){
@@ -592,7 +893,8 @@ app.addEventListener('click', function(e){
     var pre = h.id + '|';
     state.habits = state.habits.filter(function(x){ return x.id !== h.id; });
     for (var k in state.ticks) if (k.slice(0, pre.length) === pre) delete state.ticks[k];
-    save(); render();
+    state.removedHabits.push(h.id);
+    save(); render(); queueSync();
     toast('Deleted "' + h.name + '"');
   }
   else if (t.id === 'prev'){ ym = shiftMonth(ym, -1); render(); }
@@ -620,7 +922,7 @@ document.getElementById('add').addEventListener('submit', function(e){
   f.habit.value = '';
   f.points.value = 1;
   f.habit.focus();
-  save(); render();
+  save(); render(); queueSync();
 });
 
 /* ---------- backup ------------------------------------------------------ */
@@ -652,12 +954,226 @@ file.addEventListener('change', function(){
       if (!confirm('Replace ' + plural(state.habits.length, 'habit', 'habits') +
                    ' with ' + plural(s.habits.length, 'habit', 'habits') + ' from this file?')) return;
       state = s;
-      save(); render();
+      state.removedTicks = state.removedTicks || [];
+      state.removedHabits = state.removedHabits || [];
+      save(); render(); queueSync();
       toast('Backup restored');
     } catch (err){ toast('Import failed — ' + err.message); }
   };
   r.readAsText(f);
 });
+
+/* ---------- google sheet sync -------------------------------------------
+   One call does everything: POST the whole local document, the Apps Script
+   merges it with the sheet and returns the result, the app adopts that. Same
+   path for "first run on a new device", "push my change" and "pull theirs".
+
+   The request must stay a CORS *simple* request -- Apps Script cannot answer a
+   preflight, so text/plain is mandatory here. application/json would fail
+   before the script ever ran. */
+var SYNC_URL = 'habits.sync.url', SYNC_SECRET = 'habits.sync.secret';
+var syncTimer = null, syncing = false;
+
+function syncCfg(){
+  try {
+    return {url: localStorage.getItem(SYNC_URL) || '', secret: localStorage.getItem(SYNC_SECRET) || ''};
+  } catch (e) { return {url: '', secret: ''}; }
+}
+
+function syncStatus(text, bad){
+  var n = document.getElementById('syncstate');
+  if (!n) return;
+  n.textContent = text;
+  n.className = bad ? 'bad' : '';
+}
+
+// A blocked request is opaque -- CORS hides the response, so the browser reports
+// only "failed". Infer the cause from the URL and connection instead of shrugging.
+function diagnose(err, url){
+  if (/bad or missing secret/.test(err.message)) return 'wrong secret — check it matches the script';
+  if (!navigator.onLine) return 'no connection — saved locally, will retry';
+  if (/\/dev(\?|$)/.test(url)) return 'that is the /dev test URL — deploy and use the /exec one';
+  if (!/\/exec(\?|$)/.test(url)) return 'URL should end in /exec';
+  return 'blocked by Google — set “Who has access: Anyone” and redeploy';
+}
+
+function queueSync(){
+  if (!syncCfg().url) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncNow, 1200);   // debounce a burst of ticking
+}
+
+function syncNow(){
+  var cfg = syncCfg();
+  if (!cfg.url){ syncStatus('not connected'); return; }
+  if (syncing){ queueSync(); return; }
+  syncing = true;
+  syncStatus('syncing…');
+
+  fetch(cfg.url + (cfg.url.indexOf('?') < 0 ? '?' : '&') + 'secret=' + encodeURIComponent(cfg.secret), {
+    method: 'POST',
+    headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify({
+      habits: state.habits,
+      ticks: state.ticks,
+      removed: state.removedTicks,
+      removedHabits: state.removedHabits
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(remote){
+    if (remote.error) throw new Error(remote.error);
+    state.habits = remote.habits || [];
+    state.ticks = remote.ticks || {};
+    state.removedTicks = [];      // the sheet has accepted them
+    state.removedHabits = [];
+    save(); render();
+    syncStatus('synced ' + new Date().toLocaleTimeString());
+  })
+  .catch(function(e){
+    // local data is untouched and the tombstones are kept, so the next
+    // successful sync still carries everything
+    syncStatus(diagnose(e, cfg.url), true);
+  })
+  .then(function(){ syncing = false; });
+}
+
+document.getElementById('syncsave').onclick = function(){
+  var f = document.getElementById('syncform').elements;
+  try {
+    localStorage.setItem(SYNC_URL, f.url.value.trim());
+    localStorage.setItem(SYNC_SECRET, f.secret.value.trim());
+    f.secret.value = f.secret.value.trim();   // a stray pasted space fails an exact match
+  } catch (e) { return syncStatus('could not save settings', true); }
+  document.getElementById('synclink').disabled = !f.url.value.trim();
+  document.getElementById('synctest').disabled = !f.url.value.trim();
+  syncNow();
+};
+document.getElementById('syncshow').onclick = function(){
+  var i = document.getElementById('syncform').elements.secret;
+  var show = i.type === 'password';
+  i.type = show ? 'text' : 'password';
+  this.textContent = show ? 'Hide' : 'Show';
+  this.setAttribute('aria-label', (show ? 'Hide' : 'Show') + ' secret');
+};
+
+document.getElementById('syncnow').onclick = syncNow;
+
+// Opening the endpoint directly bypasses CORS, so whatever Google actually says
+// becomes visible: JSON means live and public, a sign-in page means it is not.
+document.getElementById('synctest').onclick = function(){
+  var cfg = syncCfg();
+  if (!cfg.url) return;
+  open(cfg.url + (cfg.url.indexOf('?') < 0 ? '?' : '&') + 'secret=' +
+       encodeURIComponent(cfg.secret), '_blank', 'noopener');
+  note('JSON means the deployment is live. A Google sign-in page means ' +
+       '“Who has access” is not set to Anyone.');
+};
+
+
+document.getElementById('synclink').onclick = function(){
+  var cfg = syncCfg();
+  if (!cfg.url) return;
+  var link = location.origin + location.pathname + '#s=' +
+             b64url(JSON.stringify({u: cfg.url, s: cfg.secret}));
+  var done = function(){ toast('Device link copied — open it on the other device'); };
+  if (navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(link).then(done).catch(function(){ prompt('Copy this link:', link); });
+  } else {
+    prompt('Copy this link:', link);
+  }
+};
+
+// A link opened on a fresh device configures it, then scrubs itself out of the
+// address bar so the secret is not left sitting in history or a screenshot.
+function fromLink(){
+  var m = location.hash.match(/[#&]s=([^&]+)/);
+  if (!m) return false;
+  var cfg;
+  try { cfg = JSON.parse(unb64url(m[1])); } catch (e) { return false; }
+  if (!cfg || !cfg.u) return false;
+  var current = syncCfg();
+  if (current.url && current.url !== cfg.u &&
+      !confirm('This link points at a different sheet than this device already uses. Switch to it?')) {
+    history.replaceState(null, '', location.pathname + location.search);
+    return false;
+  }
+  try {
+    localStorage.setItem(SYNC_URL, cfg.u);
+    localStorage.setItem(SYNC_SECRET, cfg.s || '');
+  } catch (e) {}
+  history.replaceState(null, '', location.pathname + location.search);
+  return true;
+}
+
+// A URL differing only by its fragment does NOT reload the page, so opening the
+// link while the app is already running fires hashchange and nothing else.
+addEventListener('hashchange', function(){
+  if (!fromLink()) return;
+  var cfg = syncCfg(), f = document.getElementById('syncform').elements;
+  f.url.value = cfg.url;
+  f.secret.value = cfg.secret;
+  document.getElementById('synclink').disabled = !cfg.url;
+  toast('Device linked — syncing');
+  syncNow();
+});
+
+// Generate button fills a readable, high-entropy secret. Word-shaped so it can be
+// typed onto a phone by hand if the clipboard is not available.
+document.getElementById('gengen').onclick = function(){
+  var words = ['amber','basalt','cinder','dune','ember','flint','glacier','harbor','indigo',
+               'juniper','kelp','lantern','marrow','nimbus','onyx','pewter','quarry','ridge',
+               'saffron','tundra','umber','vellum','willow','xenon','yarrow','zephyr'];
+  var r = new Uint32Array(4);
+  crypto.getRandomValues(r);
+  var secret = words[r[0] % words.length] + '-' + words[r[1] % words.length] + '-' +
+               words[r[2] % words.length] + '-' + (r[3] % 9000 + 1000);
+  document.getElementById('syncform').elements.secret.value = secret;
+  document.querySelector('details.sync').open = true;
+  note('Secret generated. Copy the script next — it carries this secret.');
+};
+
+function note(msg, bad){
+  var n = document.getElementById('gsnote');
+  n.textContent = msg;
+  n.style.color = bad ? 'var(--danger)' : '';
+}
+
+document.getElementById('gscopy').onclick = function(){
+  var secret = document.getElementById('syncform').elements.secret.value;
+  if (!secret) return note('Set or generate a secret first, so the script carries it.', true);
+
+  var src = document.getElementById('gs-source').textContent.trim()
+    .replace("var SECRET = 'CHANGE_ME';", "var SECRET = " + JSON.stringify(secret) + ";");
+
+  // clipboard API needs a secure context; over plain http on a LAN address it is
+  // absent, so fall back to a textarea the user can copy by hand
+  var fallback = function(){
+    var t = document.getElementById('gsfallback');
+    t.value = src;
+    t.hidden = false;
+    t.focus();
+    t.select();
+    note('Clipboard blocked here. Script is selected below — press Ctrl+C.', true);
+  };
+  if (!navigator.clipboard || !window.isSecureContext) return fallback();
+  navigator.clipboard.writeText(src)
+    .then(function(){ note('Script copied, secret already filled in. Paste it into Apps Script.'); })
+    .catch(fallback);
+};
+
+(function initSync(){
+  fromLink();
+  var cfg = syncCfg(), f = document.getElementById('syncform').elements;
+  f.url.value = cfg.url;
+  f.secret.value = cfg.secret;
+  syncStatus(cfg.url ? 'connected' : 'not connected');
+  document.getElementById('synclink').disabled = !cfg.url;
+  document.getElementById('synctest').disabled = !cfg.url;
+  if (cfg.url) syncNow();
+  // catch up after the laptop wakes or the phone regains signal
+  addEventListener('online', queueSync);
+})();
 
 /* ---------- theme ------------------------------------------------------- */
 var SUN = '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M4.3 4.3l1.6 1.6' +
